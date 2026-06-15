@@ -4,6 +4,8 @@ All notable changes to Rute Bayar will be documented in this file.
 
 ## Unreleased
 
+## v0.1.10 - 2026-06-15
+
 ### Added
 
 - Add DOKU API-mode operation aliases generated from the DOKU Postman/OpenAPI-derived spec, including stable checkout and Direct Debit path aliases.

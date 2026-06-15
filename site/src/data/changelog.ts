@@ -1,6 +1,6 @@
 export const changelogEntries = [
   {
-    version: "Unreleased",
+    version: "v0.1.10",
     date: "2026-06-15",
     tag: "DOKU API mode polish",
     summary:
