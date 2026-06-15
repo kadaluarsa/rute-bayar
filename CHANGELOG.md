@@ -4,6 +4,10 @@ All notable changes to Rute Bayar will be documented in this file.
 
 ## Unreleased
 
+### Fixed
+
+- Keep generated Homebrew formula URLs interpolating `#{version}` correctly during release tap sync.
+
 ## v0.1.11 - 2026-06-15
 
 ### Added
