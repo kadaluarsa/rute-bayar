@@ -2,7 +2,7 @@
 title: Forwarding
 description: Forward provider webhooks as pass-through JSON while keeping events stored locally.
 lang: en
-order: 4
+order: 6
 ---
 
 Forwarding lets your application receive provider callbacks without becoming the primary callback endpoint.

@@ -2,7 +2,7 @@
 title: Provider setup
 description: Onboard Xendit, Midtrans, DOKU, and iPaymu today, then track Flip Business and Duitku as provider roadmap work.
 lang: en
-order: 2
+order: 3
 ---
 
 Rute Bayar keeps provider behavior inside modular adapters. The current stable provider set includes Xendit, Midtrans, DOKU Checkout, and iPaymu.

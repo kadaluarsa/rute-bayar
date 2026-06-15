@@ -2,7 +2,7 @@
 title: AI Agent skill guide
 description: Teach an AI Agent how to create invoices, check status, and reconcile payment state through rutebayar.
 lang: en
-order: 5
+order: 7
 ---
 
 Rute Bayar can act as a careful command boundary for AI Agent billing. The agent does not need provider-specific logic; it only needs a small set of commands.

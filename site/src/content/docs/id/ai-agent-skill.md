@@ -2,7 +2,7 @@
 title: Panduan skill AI Agent
 description: Ajarkan AI Agent membuat invoice, mengecek status, dan reconcile payment lewat rutebayar.
 lang: id
-order: 5
+order: 7
 ---
 
 Rute Bayar bisa menjadi batas command yang hati-hati untuk penagihan AI Agent. Agent tidak perlu logic provider spesifik; agent hanya perlu beberapa command kecil.

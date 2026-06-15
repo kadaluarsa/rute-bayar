@@ -119,8 +119,11 @@ const supportedGateways = [
         <h2>Panggil API resmi provider saat perlu.</h2>
         <p>
           Fitur ini untuk eksperimen dan debugging cepat: pakai alias operasi atau path langsung,
-          sambil tetap pakai credential onboarding yang sama.
+          sambil tetap pakai kredensial onboarding yang sama.
         </p>
+        <div class="button-row">
+          <a class="button secondary" href={withSiteBase("/docs/api-mode/")}>Baca panduan API mode</a>
+        </div>
       </div>
       <ShellBlock title="api mode" lines={apiModeLines} />
     </div>
@@ -138,7 +141,7 @@ const supportedGateways = [
       <article class="rail-card">
         <h3>Onboarding CLI-first</h3>
         <p>
-          Atur credential provider, test account, buat payment, request refund untuk provider yang mendukungnya, dan cek status dari satu permukaan command.
+          Atur kredensial provider, test account, buat payment, request refund untuk provider yang mendukungnya, dan cek status dari satu permukaan command.
           <br />
           <small>*Refund iPaymu belum tersedia karena API publik iPaymu v2 belum mengekspos endpoint refund resmi.</small>
         </p>

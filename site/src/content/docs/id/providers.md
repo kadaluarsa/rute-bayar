@@ -2,7 +2,7 @@
 title: Setup provider
 description: Onboard Xendit, Midtrans, DOKU, dan iPaymu hari ini, lalu ikuti roadmap Flip Business dan Duitku.
 lang: id
-order: 2
+order: 3
 ---
 
 Rute Bayar menjaga perilaku provider tetap berada di adapter modular. Provider stabil saat ini mencakup Xendit, Midtrans, DOKU Checkout, dan iPaymu.

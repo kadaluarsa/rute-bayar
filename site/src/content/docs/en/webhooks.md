@@ -2,7 +2,7 @@
 title: Webhook daemon
 description: Run the webhook daemon, register provider callback URLs, and replay stored events.
 lang: en
-order: 3
+order: 5
 ---
 
 The daemon receives provider callbacks and stores the original payloads for debugging and replay.

@@ -2,7 +2,7 @@
 title: Forwarding
 description: Forward webhook provider sebagai JSON pass-through sambil tetap menyimpan event secara lokal.
 lang: id
-order: 4
+order: 6
 ---
 
 Forwarding membuat aplikasi kamu bisa menerima callback provider tanpa harus menjadi endpoint callback utama.
