@@ -99,7 +99,8 @@ Experimental: panggil API resmi provider langsung dari CLI:
 ./bin/rutebayar api midtrans --operation charge --method POST --body '{"payment_type":"bank_transfer","transaction_details":{"order_id":"rb-001","gross_amount":15000}}'
 ./bin/rutebayar api midtrans --operation status --path-param order_id=rb-001
 ./bin/rutebayar api xendit --operation auth-balance
-./bin/rutebayar api doku --method GET --path /orders/v1/status/<invoice_number>
+./bin/rutebayar api doku --operation checkout-payment --method POST --body '<doku_checkout_payload_json>'
+./bin/rutebayar api doku --operation order-status --path-param invoice_number_or_request_id=<invoice_number>
 ./bin/rutebayar api ipaymu --path /api/v2/payment-channels --method GET
 ```
 
@@ -122,6 +123,7 @@ Semua provider di mode `api` memakai credential yang tersimpan pada `provider ac
 - DOKU/IPaymu:
   - endpoint membutuhkan header/credential provider agar tidak ditolak (`Client-Id` untuk DOKU, header IPAYMU tertentu untuk iPaymu).
   - gunakan credential aktif lewat onboarding sebelum memanggil endpoint non-dummy.
+  - DOKU juga punya alias hasil konversi Postman/OpenAPI; jalankan `rutebayar api doku --help` untuk daftar lengkap seperti `checkout-payment`, `checkout-v1-payment`, dan alias Direct Debit yang tersedia di spec.
 
 ### Mapping API mode (referensi cepat)
 
@@ -138,7 +140,9 @@ Semua provider di mode `api` memakai credential yang tersimpan pada `provider ac
 | xendit | session-create / create | POST | /sessions |
 | xendit | session-status / status | GET | /sessions/{session_id} |
 | doku | checkout | POST | /checkout/v1/payment |
+| doku | checkout-payment / checkout-v1-payment | POST | /checkout/v1/payment |
 | doku | order-status / status | GET | /orders/v1/status/{invoice_number_or_request_id} |
+| doku | direct-debit-v1-token / post-direct-debit-v1-token | POST | /direct-debit/v1/token |
 | ipaymu | payment-channels / channels | GET | /api/v2/payment-channels |
 | ipaymu | transaction | POST | /api/v2/transaction |
 
@@ -147,6 +151,7 @@ Contoh:
 ```bash
 ./bin/rutebayar api midtrans --operation snap-transaction --method POST --body '<payload_json>'
 ./bin/rutebayar api xendit --operation auth-balance
+./bin/rutebayar api doku --operation checkout-payment --method POST --body '<doku_checkout_payload_json>'
 ./bin/rutebayar api doku --operation order-status --path-param invoice_number_or_request_id=RB-INV-001
 ./bin/rutebayar api ipaymu --operation payment-channels --method GET
 ```

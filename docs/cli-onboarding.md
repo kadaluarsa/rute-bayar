@@ -100,6 +100,7 @@ Contoh:
 rutebayar api midtrans --environment sandbox --operation status --path-param order_id=rb-demo-001
 rutebayar api midtrans --operation snap-transaction --method POST --body '{"transaction_details":{"order_id":"rb-demo-002","gross_amount":12000}}'
 rutebayar api xendit --operation auth-balance
+rutebayar api doku --operation checkout-payment --method POST --body '<doku_checkout_payload_json>'
 rutebayar api doku --operation order-status --path-param invoice_number_or_request_id=INV-001
 rutebayar api doku --method GET --path /orders/v1/status/INV-002
 rutebayar api ipaymu --operation payment-channels --method GET
@@ -126,7 +127,9 @@ Mapping operasi yang didukung (ringkas):
 | xendit | session-create / create | POST | /sessions |
 | xendit | session-status / status | GET | /sessions/{session_id} |
 | doku | checkout | POST | /checkout/v1/payment |
+| doku | checkout-payment / checkout-v1-payment | POST | /checkout/v1/payment |
 | doku | order-status / status | GET | /orders/v1/status/{invoice_number_or_request_id} |
+| doku | direct-debit-v1-token / post-direct-debit-v1-token | POST | /direct-debit/v1/token |
 | ipaymu | payment-channels / channels | GET | /api/v2/payment-channels |
 | ipaymu | transaction | POST | /api/v2/transaction |
 
@@ -134,6 +137,7 @@ Ringkasan hasil smoke test terakhir:
 
 - `xendit session-create` menolak payload yang belum lengkap (`reference_id` wajib ada).
 - `doku` dan `ipaymu` menolak request tanpa header/credential yang tepat.
+- `doku checkout-payment` memakai signed DOKU request otomatis dari credential onboarding; payload tetap harus mengikuti schema DOKU Checkout.
 - `midtrans` status/approve/deny/cancel/expire/refund bisa dipanggil via alias; hasil final bergantung lifecycle transaksi.
 
 Troubleshooting API mode:

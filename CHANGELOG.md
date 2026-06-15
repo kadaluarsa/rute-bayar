@@ -4,6 +4,16 @@ All notable changes to Rute Bayar will be documented in this file.
 
 ## Unreleased
 
+### Added
+
+- Add DOKU API-mode operation aliases generated from the DOKU Postman/OpenAPI-derived spec, including stable checkout and Direct Debit path aliases.
+- Expand README, CLI onboarding docs, provider docs, and site docs with DOKU API-mode examples and regeneration instructions.
+
+### Fixed
+
+- Preserve exact DOKU aliases when generated singular aliases collide with plural endpoints, so exact paths such as `/direct-debit/v1/token` remain callable by `--operation`.
+- Keep GitHub Pages deployable `main` runs in one concurrency group across push and manual dispatch events.
+
 ## v0.1.9 - 2026-06-12
 
 ### Added

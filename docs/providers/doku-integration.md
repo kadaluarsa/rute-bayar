@@ -65,6 +65,28 @@ rutebayar pay status \
 
 `provider test doku` hanya memverifikasi request signed sampai ke API DOKU; `404` pada probe dummy masih berarti auth/signature valid, bukan kegagalan integrasi.
 
+## API Mode
+
+Selain command adapter `pay create/status`, DOKU juga bisa dipanggil langsung lewat `rutebayar api doku` untuk debugging endpoint resmi provider.
+
+```bash
+rutebayar api doku --operation checkout-payment --method POST --body '<doku_checkout_payload_json>'
+rutebayar api doku --operation order-status --path-param invoice_number_or_request_id=RB-INV-001
+rutebayar api doku --operation post-direct-debit-v1-token --method POST --body '<doku_direct_debit_payload_json>'
+rutebayar api doku --help
+```
+
+Alias DOKU dibangun dari Postman collection yang dikonversi ke OpenAPI. Jika spec berubah, regenerate mapping dengan:
+
+```bash
+./scripts/convert-doku-postman-to-openapi.sh \
+  docs/apis/doku-openapi-from-postman.json \
+  /path/doku-postman-collection.json
+./scripts/generate-doku-openapi-aliases.sh \
+  docs/apis/doku-openapi-from-postman.json \
+  internal/cli/doku_openapi_aliases_generated.go
+```
+
 ## Payment Methods
 
 `--method checkout` menampilkan metode pembayaran aktif di DOKU Checkout.

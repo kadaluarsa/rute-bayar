@@ -46,7 +46,9 @@ Quick mapping:
 | Xendit | session-create / create | POST | /sessions |
 | Xendit | session-status / status | GET | /sessions/{session_id} |
 | DOKU | checkout | POST | /checkout/v1/payment |
+| DOKU | checkout-payment / checkout-v1-payment | POST | /checkout/v1/payment |
 | DOKU | order-status / status | GET | /orders/v1/status/{invoice_number_or_request_id} |
+| DOKU | direct-debit-v1-token / post-direct-debit-v1-token | POST | /direct-debit/v1/token |
 | iPaymu | payment-channels / channels | GET | /api/v2/payment-channels |
 | iPaymu | transaction | POST | /api/v2/transaction |
 
@@ -55,6 +57,7 @@ Examples:
 ```bash
 rutebayar api midtrans --operation status --path-param order_id=rb-demo-001
 rutebayar api xendit --operation auth-balance
+rutebayar api doku --operation checkout-payment --method POST --body '<doku_checkout_payload_json>'
 rutebayar api doku --operation order-status --path-param invoice_number_or_request_id=INV-001
 rutebayar api ipaymu --operation payment-channels --method GET
 ```

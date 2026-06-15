@@ -1,5 +1,18 @@
 export const changelogEntries = [
   {
+    version: "Unreleased",
+    date: "2026-06-15",
+    tag: "DOKU API mode polish",
+    summary:
+      "Perubahan berikutnya menutup gap dokumentasi DOKU API-mode setelah alias operasi DOKU berbasis Postman/OpenAPI masuk ke main.",
+    items: [
+      "Tambahkan contoh `rutebayar api doku` untuk Checkout, order status, dan alias Direct Debit yang dihasilkan dari spec.",
+      "Perjelas cara regenerate alias DOKU dari Postman collection resmi ke OpenAPI dan Go alias map.",
+      "Perbaiki collision alias DOKU agar path exact seperti `/direct-debit/v1/token` tetap bisa dipanggil via `--operation`.",
+      "Rapikan concurrency GitHub Pages supaya deploy main dari push dan workflow manual tetap terserialisasi.",
+    ],
+  },
+  {
     version: "v0.1.9",
     date: "2026-06-12",
     tag: "API mode expansion",

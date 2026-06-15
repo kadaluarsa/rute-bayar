@@ -33,6 +33,10 @@ export const LANDING_API_MODE_LINES = [
   "$ rutebayar api xendit --operation auth-balance",
   "HTTP/2 200",
   "message: Success",
+  "",
+  "$ rutebayar api doku --operation order-status --path-param invoice_number_or_request_id=RB-INV-001",
+  "HTTP/2 200",
+  "transaction.status: SUCCESS",
 ];
 
 export const LANDING_QUICK_INSTALL_LINES = [
