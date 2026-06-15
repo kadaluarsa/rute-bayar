@@ -12,7 +12,7 @@ Rute Bayar is an open source payment router for Indonesian payment gateways.
 
 The project provides one internal interface for multiple providers, starting with **Xendit**, **Midtrans**, **DOKU Checkout**, and **iPaymu**. It is designed as a Go CLI and daemon that can create payments, receive provider webhooks, store raw JSON traffic for debugging, and optionally forward incoming webhooks to user-configured targets.
 
-> Status: stable `v0.1.9`. The repository includes webhook signature verification for Midtrans and DOKU, callback-token verification for Xendit, plus `pay create`, `pay status`, `reconcile`, and SQLite persistence. Midtrans/Xendit refund flows are implemented; DOKU and iPaymu refunds are intentionally disabled until provider-specific refund/disbursement setup is wired. iPaymu refund is also not exposed in the public iPaymu API v2 collection and remains unsupported until iPaymu provides an official endpoint/payload. Real sandbox proof covers Midtrans/Xendit webhook callbacks, Xendit refund reconciliation through final `refund.succeeded` callback, DOKU sandbox checkout/status plus signed webhook forwarding simulation, and iPaymu sandbox QRIS redirect payment reconciliation to `paid`. API-mode now adds direct provider-operation aliases for Xendit based on OpenAPI/Postman-derived mapping. Webhook forwarding target management is also available via CLI.
+> Status: stable `v0.1.9`. The repository includes webhook signature verification for Midtrans and DOKU, callback-token verification for Xendit, plus `pay create`, `pay status`, `reconcile`, and SQLite persistence. Midtrans/Xendit refund flows are implemented; DOKU and iPaymu refunds are intentionally disabled until provider-specific refund/disbursement setup is wired. iPaymu refund is also not exposed in the public iPaymu API v2 collection and remains unsupported until iPaymu provides an official endpoint/payload. Real sandbox proof covers Midtrans/Xendit webhook callbacks, Xendit refund reconciliation through final `refund.succeeded` callback, DOKU sandbox checkout/status plus signed webhook forwarding simulation, and iPaymu sandbox QRIS redirect payment reconciliation to `paid`. API-mode now adds direct provider-operation aliases for Xendit and DOKU based on OpenAPI/Postman-derived mapping. Webhook forwarding target management is also available via CLI.
 
 Latest release: [v0.1.9](https://github.com/pendig/rute-bayar/releases/tag/v0.1.9)
 
@@ -103,6 +103,13 @@ Experimental: panggil API resmi provider langsung dari CLI:
 ./bin/rutebayar api ipaymu --path /api/v2/payment-channels --method GET
 ```
 
+Untuk cek daftar operation cepat:
+
+```bash
+./bin/rutebayar api --help
+./bin/rutebayar api doku --help
+```
+
 ### Catatan API mode per-provider (hasil smoke test)
 
 Semua provider di mode `api` memakai credential yang tersimpan pada `provider accounts`:
@@ -144,6 +151,12 @@ Contoh:
 ./bin/rutebayar api ipaymu --operation payment-channels --method GET
 ```
 
+Jika perlu troubleshooting cepat:
+
+- `401/403`: periksa `provider accounts` dan `--environment` harus sesuai credentials.
+- `400` saat API Mode: biasanya payload/field yang wajib belum sesuai atau credential/header belum lengkap.
+- `invalid_client_id / invalid_signature`: untuk DOKU biasanya karena credential salah, base-url salah, atau `--base-url` environment mismatch.
+
 Untuk Midtrans, operasi `api` juga mencakup alias yang dihasilkan dari file konversi Postman. Jika ingin regenerate, run:
 
 ```bash
@@ -167,6 +180,17 @@ Untuk Xendit, alias bisa dibangun dari Postman collection Xendit official + SNAP
 ./scripts/generate-xendit-openapi-aliases.sh \
   docs/apis/xendit-openapi-from-postman.json \
   internal/cli/xendit_openapi_aliases_generated.go
+```
+
+Untuk DOKU, alias bisa dibangun dari DOKU Postman collection (atau file lain yang setara):
+
+```bash
+./scripts/convert-doku-postman-to-openapi.sh \
+  docs/apis/doku-openapi-from-postman.json \
+  /path/doku-postman-collection.json
+./scripts/generate-doku-openapi-aliases.sh \
+  docs/apis/doku-openapi-from-postman.json \
+  internal/cli/doku_openapi_aliases_generated.go
 ```
 
 Note: DOKU callback delivery still depends on the matching Notification URL being configured in DOKU Back Office per channel, so keep the path aligned with `/webhooks/doku` before relying on live webhook callbacks.

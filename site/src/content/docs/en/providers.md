@@ -59,10 +59,19 @@ rutebayar api doku --operation order-status --path-param invoice_number_or_reque
 rutebayar api ipaymu --operation payment-channels --method GET
 ```
 
+View the complete operation list with:
+
+```bash
+rutebayar api doku --help
+rutebayar api xendit --help
+rutebayar api midtrans --help
+```
+
 Notes:
 
 - If `--operation` has no match, call manually using `--path`.
 - This mode complements, not replaces, `pay create/status`.
+- Quick checks: `401/403` usually indicates credential or environment mismatch, `400` usually means invalid payload, and `invalid_signature` usually indicates DOKU signature/notification setup issues.
 
 Provider roadmap:
 

@@ -59,10 +59,19 @@ rutebayar api doku --operation order-status --path-param invoice_number_or_reque
 rutebayar api ipaymu --operation payment-channels --method GET
 ```
 
+Lihat daftar operation lengkap dengan:
+
+```bash
+rutebayar api doku --help
+rutebayar api xendit --help
+rutebayar api midtrans --help
+```
+
 Catatan:
 
 - Jika `--operation` tidak cocok, endpoint bisa dipanggil manual via `--path`.
 - Jalur ini tidak menggantikan command `pay create/status`.
+- Pemeriksaan cepat: `401/403` biasanya karena credential/environment tidak cocok, `400` biasanya payload tidak valid, dan `invalid_signature` biasanya dari konfigurasi tanda tangan/notifikasi DOKU.
 
 Roadmap provider:
 

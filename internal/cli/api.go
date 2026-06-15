@@ -367,6 +367,9 @@ func resolveAPIOperation(providerCode domain.ProviderCode, operation string) (pa
 		case "order-status", "status":
 			return pathTemplateOperation{method: "GET", path: "/orders/v1/status/{invoice_number_or_request_id}"}, true
 		}
+		if candidate, ok := generatedDokuAPIOperationAliases[key]; ok {
+			return candidate, true
+		}
 	case domain.ProviderIPaymu:
 		switch key {
 		case "payment-channels", "channels":

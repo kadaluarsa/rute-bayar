@@ -32,6 +32,8 @@ Contoh alur:
 - `rutebayar onboard doku --client-id <id> --secret-key <key> --environment sandbox`
 - `rutebayar api <provider> --operation <slug> --method <method> --path <url>` (experimental)
 - `rutebayar api <provider> --operation <slug>` (jalankan alias cepat ke endpoint resmi provider)
+- `rutebayar api --help`
+- `rutebayar api <provider> --help`
 - `rutebayar provider list`
 - `rutebayar provider accounts`
 - `rutebayar provider test midtrans`
@@ -81,6 +83,17 @@ Untuk memperbarui alias operasi Xendit dari Postman collection, jalankan:
   internal/cli/xendit_openapi_aliases_generated.go
 ```
 
+Untuk memperbarui alias operasi DOKU dari Postman collection resmi, jalankan:
+
+```bash
+./scripts/convert-doku-postman-to-openapi.sh \
+  docs/apis/doku-openapi-from-postman.json \
+  /path/doku-postman-collection.json
+./scripts/generate-doku-openapi-aliases.sh \
+  docs/apis/doku-openapi-from-postman.json \
+  internal/cli/doku_openapi_aliases_generated.go
+```
+
 Contoh:
 
 ```bash
@@ -90,6 +103,14 @@ rutebayar api xendit --operation auth-balance
 rutebayar api doku --operation order-status --path-param invoice_number_or_request_id=INV-001
 rutebayar api doku --method GET --path /orders/v1/status/INV-002
 rutebayar api ipaymu --operation payment-channels --method GET
+```
+
+Untuk melihat daftar operation lengkap per provider:
+
+```bash
+rutebayar api doku --help
+rutebayar api xendit --help
+rutebayar api midtrans --help
 ```
 
 Mapping operasi yang didukung (ringkas):
@@ -114,6 +135,13 @@ Ringkasan hasil smoke test terakhir:
 - `xendit session-create` menolak payload yang belum lengkap (`reference_id` wajib ada).
 - `doku` dan `ipaymu` menolak request tanpa header/credential yang tepat.
 - `midtrans` status/approve/deny/cancel/expire/refund bisa dipanggil via alias; hasil final bergantung lifecycle transaksi.
+
+Troubleshooting API mode:
+
+- `401/403`: cek kredensial dan environment di `provider accounts`.
+- `400`: payload belum memenuhi schema/field wajib untuk operation ini.
+- `invalid_signature`/`invalid_client_id` (umumnya DOKU): cek `DOKU_CLIENT_ID`, `DOKU_SECRET_KEY`, dan `--base-url`.
+- Jika operasi tidak muncul: jalankan `rutebayar api <provider> --help` dulu.
 
 ## Onboarding Provider
 

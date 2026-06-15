@@ -1,0 +1,878 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "DOKU API (from Postman collection)",
+    "version": "2026-06-14",
+    "description": "Converted from DOKU Postman collection. Validate and enrich before production use."
+  },
+  "servers": [
+    {
+      "url": "https://api-sandbox.doku.com",
+      "description": "DOKU Sandbox"
+    },
+    {
+      "url": "https://api.doku.com",
+      "description": "DOKU Production"
+    }
+  ],
+  "paths": {
+    "/{id}/v1/accounts": {
+      "post": {
+        "operationId": "post_{id}_v1_accounts_create_sub_account",
+        "summary": "Create Sub Account",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "description": "Error"
+          }
+        }
+      }
+    },
+    "/{id}/v1/balances/{id}": {
+      "get": {
+        "operationId": "get_{id}_v1_balances_{id}_balance",
+        "summary": "Balance",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "description": "Error"
+          }
+        }
+      }
+    },
+    "/{id}/v1/payouts": {
+      "post": {
+        "operationId": "post_{id}_v1_payouts_payouts",
+        "summary": "Payouts",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "description": "Error"
+          }
+        }
+      }
+    },
+    "/{id}/v1/transfers": {
+      "post": {
+        "operationId": "post_{id}_v1_transfers_transfers",
+        "summary": "Transfers",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "description": "Error"
+          }
+        }
+      }
+    },
+    "/akulaku-peer-to-peer/v2/cancel": {
+      "post": {
+        "operationId": "post_akulaku-peer-to-peer_v2_cancel_cancellation",
+        "summary": "Cancellation",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "description": "Error"
+          }
+        }
+      }
+    },
+    "/akulaku-peer-to-peer/v2/generate-order": {
+      "post": {
+        "operationId": "post_akulaku-peer-to-peer_v2_generate-order_generate_order",
+        "summary": "Generate Order",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "description": "Error"
+          }
+        }
+      }
+    },
+    "/akulaku-peer-to-peer/v2/refund": {
+      "post": {
+        "operationId": "post_akulaku-peer-to-peer_v2_refund_refund",
+        "summary": "Refund",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "description": "Error"
+          }
+        }
+      }
+    },
+    "/alfa-online-to-offline/v2/payment-code": {
+      "post": {
+        "operationId": "post_alfa-online-to-offline_v2_payment-code_alfa_generate_payment_code",
+        "summary": "Alfa - Generate Payment Code",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "description": "Error"
+          }
+        }
+      }
+    },
+    "/authorization/v1/access-token/b2b": {
+      "post": {
+        "operationId": "post_authorization_v1_access-token_b2b_step_2_get_token",
+        "summary": "Step 2 - Get Token",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "description": "Error"
+          }
+        }
+      }
+    },
+    "/authorization/v1/access-token/b2b2c": {
+      "post": {
+        "operationId": "post_authorization_v1_access-token_b2b2c_get_token_b2b2c",
+        "summary": "Get Token B2B2C",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "description": "Error"
+          }
+        }
+      }
+    },
+    "/bca-direct-transfer/v1/order": {
+      "post": {
+        "operationId": "post_bca-direct-transfer_v1_order_generate_payment_amount",
+        "summary": "Generate Payment Amount",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "description": "Error"
+          }
+        }
+      }
+    },
+    "/bca-virtual-account/v2/payment-code": {
+      "patch": {
+        "operationId": "patch_bca-virtual-account_v2_payment-code_bca_va_update_payment_code",
+        "summary": "BCA VA - Update Payment Code",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "description": "Error"
+          }
+        }
+      },
+      "post": {
+        "operationId": "post_bca-virtual-account_v2_payment-code_bca_va_generate_payment_code",
+        "summary": "BCA VA - Generate Payment Code",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "description": "Error"
+          }
+        }
+      }
+    },
+    "/bi-snap-va/bri/v1/transfer-va/create-va": {
+      "post": {
+        "operationId": "post_bi-snap-va_bri_v1_transfer-va_create-va_step_3_create_va_dgpc_",
+        "summary": "Step 3 -  Create VA (DGPC)",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "description": "Error"
+          }
+        }
+      }
+    },
+    "/bi-snap-va/bsi/v1/transfer-va/create-va": {
+      "post": {
+        "operationId": "post_bi-snap-va_bsi_v1_transfer-va_create-va_step_3_create_va_dgpc_",
+        "summary": "Step 3 -  Create VA (DGPC)",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "description": "Error"
+          }
+        }
+      }
+    },
+    "/bi-snap-va/btn/v1/transfer-va/create-va": {
+      "post": {
+        "operationId": "post_bi-snap-va_btn_v1_transfer-va_create-va_step_3_create_va_dgpc_",
+        "summary": "Step 3 -  Create VA (DGPC)",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "description": "Error"
+          }
+        }
+      }
+    },
+    "/bi-snap-va/cimb/v1/transfer-va/create-va": {
+      "post": {
+        "operationId": "post_bi-snap-va_cimb_v1_transfer-va_create-va_step_3_create_va_dgpc_",
+        "summary": "Step 3 -  Create VA (DGPC)",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "description": "Error"
+          }
+        }
+      }
+    },
+    "/bi-snap-va/danamon/v1/transfer-va/create-va": {
+      "post": {
+        "operationId": "post_bi-snap-va_danamon_v1_transfer-va_create-va_step_3_create_va_dgpc_",
+        "summary": "Step 3 -  Create VA (DGPC)",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "description": "Error"
+          }
+        }
+      }
+    },
+    "/bi-snap-va/mandiri/v1/transfer-va/create-va": {
+      "post": {
+        "operationId": "post_bi-snap-va_mandiri_v1_transfer-va_create-va_step_3_create_va_dgpc_",
+        "summary": "Step 3 -  Create VA (DGPC)",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "description": "Error"
+          }
+        }
+      }
+    },
+    "/bi-snap-va/maybank/v1/transfer-va/create-va": {
+      "post": {
+        "operationId": "post_bi-snap-va_maybank_v1_transfer-va_create-va_step_3_create_va_dgpc_",
+        "summary": "Step 3 -  Create VA (DGPC)",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "description": "Error"
+          }
+        }
+      }
+    },
+    "/bi-snap-va/permata/v1/transfer-va/create-va": {
+      "post": {
+        "operationId": "post_bi-snap-va_permata_v1_transfer-va_create-va_step_3_create_va_dgpc_",
+        "summary": "Step 3 -  Create VA (DGPC)",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "description": "Error"
+          }
+        }
+      }
+    },
+    "/bi-snap-va/sinarmas/v1/transfer-va/create-va": {
+      "post": {
+        "operationId": "post_bi-snap-va_sinarmas_v1_transfer-va_create-va_step_3_create_va_dgpc_",
+        "summary": "Step 3 -  Create VA (DGPC)",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "description": "Error"
+          }
+        }
+      }
+    },
+    "/bni-virtual-account/v2/payment-code": {
+      "post": {
+        "operationId": "post_bni-virtual-account_v2_payment-code_bni_va_generate_payment_code",
+        "summary": "BNI VA - Generate Payment Code",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "description": "Error"
+          }
+        }
+      }
+    },
+    "/bsm-virtual-account/v2/payment-code": {
+      "patch": {
+        "operationId": "patch_bsm-virtual-account_v2_payment-code_bsi_va_update_payment_code",
+        "summary": "BSI VA - Update Payment Code",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "description": "Error"
+          }
+        }
+      },
+      "post": {
+        "operationId": "post_bsm-virtual-account_v2_payment-code_bsi_va_generate_payment_code",
+        "summary": "BSI VA - Generate Payment Code",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "description": "Error"
+          }
+        }
+      }
+    },
+    "/checkout/v1/payment": {
+      "post": {
+        "operationId": "post_checkout_v1_payment_doku_checkout_initiate_payment",
+        "summary": "DOKU Checkout - Initiate Payment",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "description": "Error"
+          }
+        }
+      }
+    },
+    "/cimb-virtual-account/v2/payment-code": {
+      "patch": {
+        "operationId": "patch_cimb-virtual-account_v2_payment-code_cimb_va_update_payment_code",
+        "summary": "CIMB VA - Update Payment Code",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "description": "Error"
+          }
+        }
+      },
+      "post": {
+        "operationId": "post_cimb-virtual-account_v2_payment-code_cimb_va_generate_payment_code",
+        "summary": "CIMB VA - Generate Payment Code",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "description": "Error"
+          }
+        }
+      }
+    },
+    "/credit-card/v1/cancellation/credit-card/refund": {
+      "post": {
+        "operationId": "post_credit-card_v1_cancellation_credit-card_refund_cc_online_refund",
+        "summary": "CC - Online Refund",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "description": "Error"
+          }
+        }
+      }
+    },
+    "/credit-card/v1/payment-page": {
+      "post": {
+        "operationId": "post_credit-card_v1_payment-page_cc_generate_payment_page",
+        "summary": "CC - Generate Payment Page",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "description": "Error"
+          }
+        }
+      }
+    },
+    "/direct-debit/core/v1/balance-inquiry": {
+      "post": {
+        "operationId": "post_direct-debit_core_v1_balance-inquiry_balance_inquiry",
+        "summary": "Balance Inquiry",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "description": "Error"
+          }
+        }
+      }
+    },
+    "/direct-debit/core/v1/debit/cancel": {
+      "post": {
+        "operationId": "post_direct-debit_core_v1_debit_cancel_cancel",
+        "summary": "Cancel",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "description": "Error"
+          }
+        }
+      }
+    },
+    "/direct-debit/core/v1/debit/payment-host-to-host": {
+      "post": {
+        "operationId": "post_direct-debit_core_v1_debit_payment-host-to-host_payment",
+        "summary": "Payment",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "description": "Error"
+          }
+        }
+      }
+    },
+    "/direct-debit/core/v1/debit/refund": {
+      "post": {
+        "operationId": "post_direct-debit_core_v1_debit_refund_refund",
+        "summary": "Refund",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "description": "Error"
+          }
+        }
+      }
+    },
+    "/direct-debit/core/v1/otp": {
+      "post": {
+        "operationId": "post_direct-debit_core_v1_otp_request_otp_binding",
+        "summary": "Request OTP Binding",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "description": "Error"
+          }
+        }
+      }
+    },
+    "/direct-debit/core/v1/otp-verification": {
+      "post": {
+        "operationId": "post_direct-debit_core_v1_otp-verification_verify_otp_payment",
+        "summary": "Verify OTP Payment",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "description": "Error"
+          }
+        }
+      }
+    },
+    "/direct-debit/core/v1/registration-account-binding": {
+      "post": {
+        "operationId": "post_direct-debit_core_v1_registration-account-binding_account_binding",
+        "summary": "Account Binding",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "description": "Error"
+          }
+        }
+      }
+    },
+    "/direct-debit/core/v1/registration-account-unbinding": {
+      "post": {
+        "operationId": "post_direct-debit_core_v1_registration-account-unbinding_account_unbinding",
+        "summary": "Account Unbinding",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "description": "Error"
+          }
+        }
+      }
+    },
+    "/direct-debit/core/v1/registration-card-bind": {
+      "post": {
+        "operationId": "post_direct-debit_core_v1_registration-card-bind_card_binding",
+        "summary": "Card Binding",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "description": "Error"
+          }
+        }
+      }
+    },
+    "/direct-debit/core/v1/registration-card-unbind": {
+      "post": {
+        "operationId": "post_direct-debit_core_v1_registration-card-unbind_card_unbinding",
+        "summary": "Card Unbinding",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "description": "Error"
+          }
+        }
+      }
+    },
+    "/direct-debit/v1/payment": {
+      "post": {
+        "operationId": "post_direct-debit_v1_payment_payment_create_payment",
+        "summary": "Payment - Create Payment",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "description": "Error"
+          }
+        }
+      }
+    },
+    "/direct-debit/v1/payment-otp": {
+      "post": {
+        "operationId": "post_direct-debit_v1_payment-otp_payment_resend_otp",
+        "summary": "Payment - Resend OTP",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "description": "Error"
+          }
+        }
+      }
+    },
+    "/direct-debit/v1/payment-recurring": {
+      "post": {
+        "operationId": "post_direct-debit_v1_payment-recurring_payment_create_recurring_payment",
+        "summary": "Payment - Create Recurring Payment",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "description": "Error"
+          }
+        }
+      }
+    },
+    "/direct-debit/v1/payment/validate": {
+      "post": {
+        "operationId": "post_direct-debit_v1_payment_validate_payment_validate_otp",
+        "summary": "Payment - Validate OTP",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "description": "Error"
+          }
+        }
+      }
+    },
+    "/direct-debit/v1/token": {
+      "post": {
+        "operationId": "post_direct-debit_v1_token_register_card_create_token",
+        "summary": "Register Card - Create Token",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "description": "Error"
+          }
+        }
+      }
+    },
+    "/direct-debit/v1/token-delete": {
+      "post": {
+        "operationId": "post_direct-debit_v1_token-delete_delete_card",
+        "summary": "Delete Card",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "description": "Error"
+          }
+        }
+      }
+    },
+    "/direct-debit/v1/token-otp": {
+      "post": {
+        "operationId": "post_direct-debit_v1_token-otp_register_card_resend_otp",
+        "summary": "Register Card - Resend OTP",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "description": "Error"
+          }
+        }
+      }
+    },
+    "/direct-debit/v1/token/validate": {
+      "post": {
+        "operationId": "post_direct-debit_v1_token_validate_register_card_validate_otp",
+        "summary": "Register Card - Validate OTP",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "description": "Error"
+          }
+        }
+      }
+    },
+    "/direct-debit/v1/tokens": {
+      "post": {
+        "operationId": "post_direct-debit_v1_tokens_get_card_list",
+        "summary": "Get Card List",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "description": "Error"
+          }
+        }
+      }
+    },
+    "/doku-virtual-account/v2/payment-code": {
+      "patch": {
+        "operationId": "patch_doku-virtual-account_v2_payment-code_doku_va_update_payment_code",
+        "summary": "DOKU VA - Update Payment Code",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "description": "Error"
+          }
+        }
+      },
+      "post": {
+        "operationId": "post_doku-virtual-account_v2_payment-code_doku_va_generate_payment_code",
+        "summary": "DOKU VA - Generate Payment Code",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "description": "Error"
+          }
+        }
+      }
+    },
+    "/indomaret-online-to-offline/v2/payment-code": {
+      "post": {
+        "operationId": "post_indomaret-online-to-offline_v2_payment-code_indomaret_generate_payment_code_copy",
+        "summary": "Indomaret - Generate Payment Code Copy",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "description": "Error"
+          }
+        }
+      }
+    },
+    "/jsrsasign": {
+      "get": {
+        "operationId": "get_jsrsasign_step_1_init_kjur",
+        "summary": "Step 1 - Init KJUR",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "description": "Error"
+          }
+        }
+      }
+    },
+    "/mandiri-virtual-account/v2/merchant-payment-code": {
+      "post": {
+        "operationId": "post_mandiri-virtual-account_v2_merchant-payment-code_mandiri_va_generate_payment_code",
+        "summary": "Mandiri VA - Generate Payment Code",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "description": "Error"
+          }
+        }
+      }
+    },
+    "/mandiri-virtual-account/v2/payment-code": {
+      "patch": {
+        "operationId": "patch_mandiri-virtual-account_v2_payment-code_mandiri_va_update_payment_code",
+        "summary": "Mandiri VA - Update Payment Code",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "description": "Error"
+          }
+        }
+      }
+    },
+    "/orders/v1/status/{id}": {
+      "get": {
+        "operationId": "get_orders_v1_status_{id}_check_status_api",
+        "summary": "Check Status API",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "description": "Error"
+          }
+        }
+      }
+    },
+    "/ovo-emoney/v1/cancel": {
+      "post": {
+        "operationId": "post_ovo-emoney_v1_cancel_ovo_void",
+        "summary": "OVO - Void",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "description": "Error"
+          }
+        }
+      }
+    },
+    "/ovo-emoney/v1/payment": {
+      "post": {
+        "operationId": "post_ovo-emoney_v1_payment_ovo_payment",
+        "summary": "OVO - Payment",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "description": "Error"
+          }
+        }
+      }
+    },
+    "/permata-virtual-account/v2/payment-code": {
+      "patch": {
+        "operationId": "patch_permata-virtual-account_v2_payment-code_permata_va_update_payment_code",
+        "summary": "Permata VA - Update Payment Code",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "description": "Error"
+          }
+        }
+      },
+      "post": {
+        "operationId": "post_permata-virtual-account_v2_payment-code_permata_va_generate_payment_code",
+        "summary": "Permata VA - Generate Payment Code",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "description": "Error"
+          }
+        }
+      }
+    },
+    "/shopeepay-emoney/v2/order": {
+      "post": {
+        "operationId": "post_shopeepay-emoney_v2_order_shopee_pay_create_order",
+        "summary": "Shopee Pay - Create Order",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "description": "Error"
+          }
+        }
+      }
+    },
+    "/virtual-accounts/bi-snap-va/v1/transfer-va/create-va": {
+      "post": {
+        "operationId": "post_virtual-accounts_bi-snap-va_v1_transfer-va_create-va_step_3_create_va_dgpc_",
+        "summary": "Step 3 -  Create VA (DGPC)",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "description": "Error"
+          }
+        }
+      }
+    }
+  }
+}

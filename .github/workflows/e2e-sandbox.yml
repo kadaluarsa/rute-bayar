@@ -16,6 +16,13 @@ on:
   pull_request:
     branches:
       - main
+    paths:
+      - "cmd/**"
+      - "internal/**"
+      - "scripts/**"
+      - "go.mod"
+      - "go.sum"
+      - ".github/workflows/e2e-sandbox.yml"
 
 permissions:
   contents: read

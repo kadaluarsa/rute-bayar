@@ -140,6 +140,39 @@ func TestResolveAPIOperation_XenditUsesGeneratedAliasAndManualFallback(t *testin
 	}
 }
 
+func TestResolveAPIOperation_DokuUsesGeneratedAliasAndManualFallback(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		operation string
+		method    string
+		path      string
+	}{
+		{name: "manual checkout", operation: "checkout", method: http.MethodPost, path: "/checkout/v1/payment"},
+		{name: "manual status alias", operation: "status", method: http.MethodGet, path: "/orders/v1/status/{invoice_number_or_request_id}"},
+		{name: "generated checkout-payment", operation: "checkout-payment", method: http.MethodPost, path: "/checkout/v1/payment"},
+		{name: "generated payment", operation: "payment", method: http.MethodPost, path: "/checkout/v1/payment"},
+	}
+
+	for _, tc := range tests {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			alias, ok := resolveAPIOperation(domain.ProviderDoku, tc.operation)
+			if !ok {
+				t.Fatalf("operation %q should be available", tc.operation)
+			}
+			if alias.method != tc.method {
+				t.Fatalf("operation %q method = %q, want %q", tc.operation, alias.method, tc.method)
+			}
+			if alias.path != tc.path {
+				t.Fatalf("operation %q path = %q, want %q", tc.operation, alias.path, tc.path)
+			}
+		})
+	}
+}
+
 func TestWebhookForwardCLI(t *testing.T) {
 	t.Parallel()
 
