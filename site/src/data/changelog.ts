@@ -1,5 +1,18 @@
 export const changelogEntries = [
   {
+    version: "v0.1.11",
+    date: "2026-06-15",
+    tag: "API mode QA and MCP guide",
+    summary:
+      "Rilis ini menutup gap dokumentasi QA API mode dan mapping MCP agar AI Agent bisa memakai `rutebayar api <provider>` dengan guardrail yang jelas.",
+    items: [
+      "Tambahkan checklist QA untuk help command, provider accounts, dan smoke command read-only per provider.",
+      "Tambahkan mapping MCP untuk auth check, status payment, create checkout, payment channels, dan raw provider call.",
+      "Perjelas guardrail agent: sandbox default, approval untuk operasi mutating, reference unik, dan transcript yang sudah diredaksi.",
+      "Tambahkan halaman docs bilingual dan link dari panduan utama API mode.",
+    ],
+  },
+  {
     version: "v0.1.10",
     date: "2026-06-15",
     tag: "DOKU API mode polish",

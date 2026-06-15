@@ -22,6 +22,7 @@ Kumpulan dokumentasi awal untuk proyek **Rute Bayar**, payment router berbasis G
 - [Development](./development.md)
 - [Xendit Sandbox Simulation](./xendit-sandbox-simulation.md)
 - [Midtrans Sandbox Simulation](./midtrans-sandbox-simulation.md)
+- [API Mode QA and MCP Mapping](./api-mode-qa-mcp.md)
 
 ## Prinsip Utama
 

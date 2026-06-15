@@ -4,6 +4,13 @@ All notable changes to Rute Bayar will be documented in this file.
 
 ## Unreleased
 
+## v0.1.11 - 2026-06-15
+
+### Added
+
+- Add API mode QA and MCP mapping documentation for safe AI Agent usage, including read-only smoke commands, mutation guardrails, and provider operation mapping.
+- Add bilingual site docs for API mode QA/MCP usage and link them from the main API mode guide.
+
 ## v0.1.10 - 2026-06-15
 
 ### Added

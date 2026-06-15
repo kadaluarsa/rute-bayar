@@ -61,6 +61,8 @@ rutebayar api doku --help
 rutebayar api ipaymu --help
 ```
 
+Untuk checklist QA dan mapping tool MCP/AI Agent yang aman, lihat [QA API mode dan mapping MCP](/docs/api-mode-mcp/).
+
 ## Contoh provider
 
 Midtrans status dan Snap:
