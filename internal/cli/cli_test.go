@@ -150,9 +150,10 @@ func TestResolveAPIOperation_DokuUsesGeneratedAliasAndManualFallback(t *testing.
 		path      string
 	}{
 		{name: "manual checkout", operation: "checkout", method: http.MethodPost, path: "/checkout/v1/payment"},
+		{name: "generated post-direct-debit-v1-token", operation: "post-direct-debit-v1-token", method: http.MethodPost, path: "/direct-debit/v1/token"},
 		{name: "manual status alias", operation: "status", method: http.MethodGet, path: "/orders/v1/status/{invoice_number_or_request_id}"},
 		{name: "generated checkout-payment", operation: "checkout-payment", method: http.MethodPost, path: "/checkout/v1/payment"},
-		{name: "generated payment", operation: "payment", method: http.MethodPost, path: "/checkout/v1/payment"},
+		{name: "generated checkout-v1-payment", operation: "checkout-v1-payment", method: http.MethodPost, path: "/checkout/v1/payment"},
 	}
 
 	for _, tc := range tests {
@@ -170,6 +171,10 @@ func TestResolveAPIOperation_DokuUsesGeneratedAliasAndManualFallback(t *testing.
 				t.Fatalf("operation %q path = %q, want %q", tc.operation, alias.path, tc.path)
 			}
 		})
+	}
+
+	if _, ok := resolveAPIOperation(domain.ProviderDoku, "payment"); ok {
+		t.Fatal("operation \"payment\" should not resolve for doku anymore because aliases are now unique")
 	}
 }
 

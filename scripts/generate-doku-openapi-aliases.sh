@@ -74,6 +74,10 @@ function maybeSingularize(value) {
 	return value.slice(0, -1);
 }
 
+function isSnapRelatedPath(segments) {
+	return segments.some((segment) => String(segment || '').toLowerCase().includes('snap'));
+}
+
 function buildAliases(path, method) {
 	const normalized = String(path || '').split('?')[0].trim();
 	if (!normalized) {
@@ -86,56 +90,73 @@ function buildAliases(path, method) {
 		.map((segment) => segment.trim())
 		.filter((segment) => segment.length > 0);
 
-	const aliases = new Set();
+	const aliases = new Map();
+	const addAlias = (alias, isExact) => {
+		if (!alias) {
+			return;
+		}
+
+		const existing = aliases.get(alias);
+		if (!existing || (!existing.isExact && isExact)) {
+			aliases.set(alias, { isExact });
+		}
+	};
 	const allVariants = [
-		segments,
-		withoutVersions(segments),
+		{ segments, isExact: true },
+		{ segments: withoutVersions(segments), isExact: false },
 	];
 
 	for (const variant of allVariants) {
-		const compact = [...new Set(variant)];
+		const variantSegments = variant.segments;
+		if (variantSegments.length === 0) {
+			continue;
+		}
+
+		const variantIsExact = variant.isExact;
+		const compact = [...new Set(variantSegments)];
 		if (compact.length === 0) {
 			continue;
 		}
 
 		const baseAlias = sanitizeAlias(compact.join('-'));
 		if (baseAlias) {
-			aliases.add(baseAlias);
+			addAlias(baseAlias, variantIsExact);
 			const baseSingular = maybeSingularize(baseAlias);
 			if (baseSingular) {
-				aliases.add(baseSingular);
+				addAlias(baseSingular, false);
 			}
 		}
 
 		const lastAlias = sanitizeAlias(compact[compact.length - 1]);
 		if (lastAlias) {
-			aliases.add(lastAlias);
+			addAlias(lastAlias, variantIsExact);
 			const singularLast = maybeSingularize(lastAlias);
 			if (singularLast) {
-				aliases.add(singularLast);
+				addAlias(singularLast, false);
 			}
 
 			if (methodLower) {
-				aliases.add(`${methodLower}-${lastAlias}`);
+				addAlias(`${methodLower}-${lastAlias}`, variantIsExact);
 				if (singularLast) {
-					aliases.add(`${methodLower}-${singularLast}`);
+					addAlias(`${methodLower}-${singularLast}`, false);
 				}
 			}
 		}
 	}
 
 	if (methodLower) {
-		for (const alias of Array.from(aliases)) {
+		for (const [alias, { isExact }] of Array.from(aliases)) {
 			if (alias.startsWith(`${methodLower}-`)) {
 				continue;
 			}
-			aliases.add(`${methodLower}-${alias}`);
+			addAlias(`${methodLower}-${alias}`, isExact);
 		}
 	}
 
-	return [...new Set(Array.from(aliases))];
+	return [...aliases.entries()].map(([alias, meta]) => ({ alias, isExact: meta.isExact }));
 }
 
+const aliasTargets = new Map();
 const generated = new Map();
 for (const [rawPath, methods] of Object.entries(spec.paths || {})) {
 	if (typeof methods !== 'object' || methods === null) {
@@ -162,18 +183,48 @@ for (const [rawPath, methods] of Object.entries(spec.paths || {})) {
 			continue;
 		}
 
+		if (isSnapRelatedPath(normalizedPathSegments)) {
+			continue;
+		}
+
 		const method = rawMethod.toUpperCase();
 		if (!method) {
 			continue;
 		}
 
-		for (const alias of buildAliases(rawPath, method)) {
-			if (!alias || generated.has(alias)) {
+		const methodPathKey = `${method} ${rawPath}`;
+		for (const { alias, isExact } of buildAliases(rawPath, method)) {
+			const existing = aliasTargets.get(alias);
+			if (!existing) {
+				aliasTargets.set(alias, [{ methodPath: methodPathKey, isExact }]);
 				continue;
 			}
-			generated.set(alias, { method, path: rawPath });
+
+			existing.push({ methodPath: methodPathKey, isExact });
 		}
 	}
+}
+
+for (const [alias, entries] of aliasTargets.entries()) {
+	if (entries.length === 1) {
+		const methodPath = entries[0].methodPath;
+		const separatorIndex = methodPath.indexOf(' ');
+		const method = methodPath.slice(0, separatorIndex);
+		const path = methodPath.slice(separatorIndex + 1);
+		generated.set(alias, { method, path });
+		continue;
+	}
+
+	const exactEntries = entries.filter((entry) => entry.isExact);
+	if (exactEntries.length !== 1) {
+		continue;
+	}
+
+	const methodPath = exactEntries[0].methodPath;
+	const separatorIndex = methodPath.indexOf(' ');
+	const method = methodPath.slice(0, separatorIndex);
+	const path = methodPath.slice(separatorIndex + 1);
+	generated.set(alias, { method, path });
 }
 
 function formatGoString(value) {
