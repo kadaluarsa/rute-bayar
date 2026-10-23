@@ -12,6 +12,7 @@ All notable changes to Rute Bayar will be documented in this file.
 - Signed, retrying outbox of normalized payment events to Wishpull (`RUTE_BAYAR_WISHPULL_EVENTS_URL`), with admin listing and requeue endpoints.
 - Gateway credentials from environment variables (`RUTE_BAYAR_ACCOUNT_<PROVIDER>_<ENV>_CREDENTIAL_JSON`) for Secret Manager.
 - Prometheus `/metrics`, graceful SIGTERM shutdown, Dockerfile, GKE StatefulSet manifest and routing config example.
+- Merchant activation list (`enabled` in the routing config), per-gateway request requirements checked before calling (iPaymu phone/email/notifyUrl), `RUTE_BAYAR_PUBLIC_URL` for iPaymu callbacks, and `rutebayar gateways check`.
 - Midtrans Mandiri VA via `echannel` (biller code + bill key) and QRIS `qr_string`.
 
 ### Changed

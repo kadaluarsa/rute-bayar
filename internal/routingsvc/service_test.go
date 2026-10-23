@@ -80,7 +80,7 @@ func newHarness(t *testing.T, cfg router.Config) *harness {
 		t.Fatal(err)
 	}
 	payments := &fakePayments{outcome: map[domain.ProviderCode]func(paymentsvc.CreateInput) (paymentsvc.CreateResult, error){}}
-	svc := New(router.New(cfg, nil, nil), routetoken.NewIssuer(signer, 15*time.Minute), payments, store, metrics.NewSet(), Config{Environment: domain.EnvironmentSandbox})
+	svc := New(router.New(cfg, nil, nil), routetoken.NewIssuer(signer, 15*time.Minute), payments, store, metrics.NewSet(), Config{Environment: domain.EnvironmentSandbox, NotificationBaseURL: "https://rb.example"})
 	return &harness{svc: svc, payments: payments, store: store, now: time.Now()}
 }
 
@@ -151,7 +151,7 @@ func TestExecuteFallsBackOnTimeoutForPushMethods(t *testing.T) {
 	h.payments.outcome[domain.ProviderIPaymu] = ok("7001", "")
 	tok := h.token(t, "ord-2", "va_bni", 50000)
 
-	res, err := h.svc.Execute(context.Background(), ExecuteInput{RoutingToken: tok.Token, Mandate: h.mandateFor("ord-2", 50000)})
+	res, err := h.svc.Execute(context.Background(), ExecuteInput{RoutingToken: tok.Token, Mandate: h.mandateFor("ord-2", 50000), CustomerPhone: "0812", CustomerEmail: "a@b.c"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -301,7 +301,7 @@ func TestOpenCircuitSkipsGateway(t *testing.T) {
 	if len(tok.Claims.Providers) != 1 || tok.Claims.Providers[0] != domain.ProviderIPaymu {
 		t.Fatalf("open circuit should drop midtrans from the plan: %v", tok.Claims.Providers)
 	}
-	res, err := h.svc.Execute(context.Background(), ExecuteInput{RoutingToken: tok.Token, Mandate: h.mandateFor("ord-9", 10000)})
+	res, err := h.svc.Execute(context.Background(), ExecuteInput{RoutingToken: tok.Token, Mandate: h.mandateFor("ord-9", 10000), CustomerPhone: "0812", CustomerEmail: "a@b.c"})
 	if err != nil || res.Provider != domain.ProviderIPaymu {
 		t.Fatalf("expected ipaymu: %+v %v", res, err)
 	}
@@ -312,5 +312,74 @@ func TestIssueTokenRequiresLiveMandate(t *testing.T) {
 	_, err := h.svc.IssueToken(context.Background(), TokenInput{OrderID: "o", MandateID: "m", MerchantID: "x", CartHash: "c", Amount: 1000, Method: "va_bca", MandateExpiresAt: h.now.Add(-time.Second)})
 	if !errors.Is(err, ErrInvalidArgument) {
 		t.Fatalf("expired mandate must not get a token: %v", err)
+	}
+}
+
+func TestGatewayRequirementsAreCheckedBeforeCalling(t *testing.T) {
+	h := newHarness(t, vaConfig())
+	h.payments.outcome[domain.ProviderMidtrans] = fail(errors.New("midtrans create payment returned status 503"))
+	h.payments.outcome[domain.ProviderIPaymu] = ok("77", "")
+	tok := h.token(t, "ord-10", "va_bca", 10000)
+
+	// Without phone/email iPaymu is skipped, not called and not blamed.
+	res, err := h.svc.Execute(context.Background(), ExecuteInput{RoutingToken: tok.Token, Mandate: h.mandateFor("ord-10", 10000)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := h.payments.providers(); len(got) != 1 || got[0] != domain.ProviderMidtrans {
+		t.Fatalf("ipaymu must not be called without its required fields: %v", got)
+	}
+	last := res.Attempts[len(res.Attempts)-1]
+	if last.Provider != domain.ProviderIPaymu || last.Outcome != "skipped" || !strings.Contains(last.Error, "customer.phone") {
+		t.Fatalf("skip reason should name the missing fields: %+v", res.Attempts)
+	}
+	if res.Status != domain.RouteExecutionRequiresReconcile {
+		t.Fatalf("midtrans 503 on a push method then nothing else possible -> reconcile: %+v", res)
+	}
+}
+
+func TestNotificationURLFilledForIPaymuAndStrippedForXendit(t *testing.T) {
+	cfg := router.DefaultConfig()
+	cfg.Rules = []router.Rule{{Family: router.FamilyQRIS, Candidates: []domain.ProviderCode{domain.ProviderXendit, domain.ProviderIPaymu}, Optimize: router.OptimizePriority}}
+	h := newHarness(t, cfg)
+	h.payments.outcome[domain.ProviderXendit] = fail(errors.New("xendit create payment returned status 503"))
+	h.payments.outcome[domain.ProviderIPaymu] = ok("", "https://qr.example/img")
+	tok := h.token(t, "ord-11", "qris", 10000)
+	if _, err := h.svc.Execute(context.Background(), ExecuteInput{RoutingToken: tok.Token, Mandate: h.mandateFor("ord-11", 10000), CustomerPhone: "0812", CustomerEmail: "a@b.c", NotificationURL: "https://override.example/cb"}); err != nil {
+		t.Fatal(err)
+	}
+	if h.payments.calls[0].NotificationURL != "" {
+		t.Fatal("xendit rejects per-payment notification URLs; it must be stripped")
+	}
+	if h.payments.calls[1].NotificationURL != "https://override.example/cb" {
+		t.Fatalf("explicit notification URL should reach ipaymu, got %q", h.payments.calls[1].NotificationURL)
+	}
+
+	tok = h.token(t, "ord-12", "qris", 10000)
+	if _, err := h.svc.Execute(context.Background(), ExecuteInput{RoutingToken: tok.Token, Mandate: h.mandateFor("ord-12", 10000), CustomerPhone: "0812", CustomerEmail: "a@b.c"}); err != nil {
+		t.Fatal(err)
+	}
+	if got := h.payments.calls[len(h.payments.calls)-1].NotificationURL; got != "https://rb.example/webhooks/ipaymu" {
+		t.Fatalf("ipaymu should get the instance webhook URL, got %q", got)
+	}
+}
+
+func TestAdapterValidationErrorIsNotAGatewayFailure(t *testing.T) {
+	cfg := router.DefaultConfig()
+	cfg.Rules = []router.Rule{{Family: router.FamilyCreditCard, Candidates: []domain.ProviderCode{domain.ProviderMidtrans, domain.ProviderDoku}, Optimize: router.OptimizePriority}}
+	h := newHarness(t, cfg)
+	// Adapter refuses before building a request (no raw request/response).
+	h.payments.outcome[domain.ProviderMidtrans] = fail(errors.New("midtrans card token is required for credit card"))
+	h.payments.outcome[domain.ProviderDoku] = ok("", "https://doku.example/pay")
+	tok, err := h.svc.IssueToken(context.Background(), TokenInput{OrderID: "ord-13", MandateID: "mdt-ord-13", MerchantID: "mer-1", CartHash: "cart-ord-13", Amount: 5000, Method: "credit_card", MandateExpiresAt: h.now.Add(time.Minute), HasClientToken: true, ClientTokenSource: domain.ProviderMidtrans})
+	if err != nil {
+		t.Fatal(err)
+	}
+	res, err := h.svc.Execute(context.Background(), ExecuteInput{RoutingToken: tok.Token, Mandate: h.mandateFor("ord-13", 5000), CardToken: "x", CardTokenProvider: domain.ProviderMidtrans})
+	if err != nil || res.Status != domain.RouteExecutionIssued || res.Provider != domain.ProviderDoku {
+		t.Fatalf("local validation error on a direct card charge should still fall back: %+v %v", res, err)
+	}
+	if res.Attempts[0].FailureClass != router.FailureNotSent {
+		t.Fatalf("expected not_sent, got %+v", res.Attempts[0])
 	}
 }

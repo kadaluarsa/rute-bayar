@@ -56,6 +56,8 @@ type Candidate struct {
 	AdapterMethod  string              `json:"-"`
 	AdapterChannel string              `json:"-"`
 	NeedsClientTok bool                `json:"requires_client_token"`
+	Requires       []string            `json:"requires,omitempty"`
+	Support        Support             `json:"-"`
 }
 
 // Rejection explains why a gateway was left out of the plan.
@@ -132,6 +134,10 @@ func (r *Router) Quote(ctx context.Context, input QuoteInput) (Decision, error) 
 			rejected = append(rejected, Rejection{Provider: code, Reason: "method_not_supported_by_adapter"})
 			continue
 		}
+		if !r.cfg.IsEnabled(code, method) {
+			rejected = append(rejected, Rejection{Provider: code, Reason: "not_enabled_for_merchant"})
+			continue
+		}
 		if r.available != nil && !r.available(ctx, code, input.Environment) {
 			rejected = append(rejected, Rejection{Provider: code, Reason: "not_configured"})
 			continue
@@ -159,6 +165,8 @@ func (r *Router) Quote(ctx context.Context, input QuoteInput) (Decision, error) 
 			AdapterMethod:  support.AdapterMethod,
 			AdapterChannel: support.AdapterChannel(method.Channel),
 			NeedsClientTok: support.RequiresClientToken,
+			Requires:       support.Requirements(),
+			Support:        support,
 		})
 	}
 

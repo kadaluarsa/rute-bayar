@@ -77,7 +77,7 @@ func buildRoutingPlane(cfg config.Config, store *sqlite.Store, env domain.Enviro
 
 	m := metrics.NewSet()
 	registerGauges(m, r, store)
-	routing := routingsvc.New(r, issuer, payments, store, m, routingsvc.Config{Environment: env})
+	routing := routingsvc.New(r, issuer, payments, store, m, routingsvc.Config{Environment: env, NotificationBaseURL: cfg.PublicURL})
 	return &routingPlane{
 		routing:  routing,
 		metrics:  m,
@@ -157,6 +157,9 @@ func productionWarnings(w io.Writer, cfg config.Config, env domain.Environment) 
 	if strings.TrimSpace(cfg.EventsURL) == "" {
 		fmt.Fprintln(w, "WARNING: RUTE_BAYAR_WISHPULL_EVENTS_URL is empty; Wishpull will not receive payment callbacks.")
 	}
+	if strings.TrimSpace(cfg.PublicURL) == "" {
+		fmt.Fprintln(w, "WARNING: RUTE_BAYAR_PUBLIC_URL is empty; iPaymu (needs a per-payment notifyUrl) is skipped unless the caller sends notification_url.")
+	}
 	if strings.HasPrefix(cfg.DBPath, "/tmp") {
 		fmt.Fprintln(w, "WARNING: the SQLite database is under /tmp and will not survive a restart.")
 	}
@@ -193,4 +196,89 @@ func mcpCommand(ctx context.Context, stdout, stderr io.Writer, args []string) er
 	}
 	fmt.Fprintf(stderr, "rute-bayar MCP (stdio) environment=%s db=%s\n", env, *dbPath)
 	return plane.mcp.ServeStdio(ctx, os.Stdin, stdout)
+}
+
+// gatewaysCommand prints which gateway can serve which method in this
+// deployment: adapter support, credentials and the merchant enabled list.
+func gatewaysCommand(ctx context.Context, stdout, stderr io.Writer, args []string) error {
+	if len(args) == 0 || args[0] != "check" {
+		return fmt.Errorf("usage: rutebayar gateways check [--environment sandbox|production] [--db path]")
+	}
+	cfg := config.Load()
+	fs := flag.NewFlagSet("gateways check", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	environment := fs.String("environment", cfg.Environment, "gateway credential environment")
+	dbPath := fs.String("db", cfg.DBPath, "sqlite database path")
+	if err := fs.Parse(args[1:]); err != nil {
+		return err
+	}
+	env := domain.Environment(strings.TrimSpace(*environment))
+	if err := validateEnvironment(string(env)); err != nil {
+		return err
+	}
+	routerCfg, err := router.LoadConfig(cfg.RoutingConfigPath)
+	if err != nil {
+		return err
+	}
+	store, err := sqlite.Open(ctx, *dbPath)
+	if err != nil {
+		return err
+	}
+	defer store.Close()
+	loader := accountLoader(store)
+
+	fmt.Fprintf(stdout, "environment: %s\n\n", env)
+	fmt.Fprintf(stdout, "%-9s %-12s %-6s %-11s %-8s %s\n", "GATEWAY", "FAMILY", "MODE", "CREDENTIAL", "ENABLED", "CHANNELS / NOTES")
+	for _, code := range domain.SupportedProviders() {
+		_, accErr := loader.GetProviderAccount(ctx, code, env)
+		credential := "missing"
+		if accErr == nil {
+			credential = "ok"
+		}
+		for _, sup := range router.DefaultSupport() {
+			if sup.Provider != code {
+				continue
+			}
+			enabled := "yes"
+			if !routerCfg.IsEnabled(code, router.Method{Family: sup.Family}) {
+				enabled = "partial"
+				if !anyChannelEnabled(routerCfg, sup) {
+					enabled = "no"
+				}
+			}
+			notes := "any"
+			if len(sup.Channels) > 0 {
+				notes = strings.Join(sup.Channels, ",")
+			}
+			var extra []string
+			if sup.RequiresClientToken {
+				extra = append(extra, "needs gateway SDK card token")
+			}
+			if req := sup.Requirements(); len(req) > 0 {
+				extra = append(extra, "needs "+strings.Join(req, "+"))
+			}
+			if !sup.ChannelEnforced {
+				extra = append(extra, "hosted page: customer picks method, fee indicative")
+			}
+			if len(extra) > 0 {
+				notes += " (" + strings.Join(extra, "; ") + ")"
+			}
+			fmt.Fprintf(stdout, "%-9s %-12s %-6s %-11s %-8s %s\n", code, sup.Family, sup.Mode, credential, enabled, notes)
+		}
+	}
+	fmt.Fprintln(stdout, "\nNot routable by any adapter yet: native linked-account direct debit (e.g. BCA OneKlik), Midtrans GoPay/ShopeePay, Xendit per-channel direct API.")
+	return nil
+}
+
+func anyChannelEnabled(cfg router.Config, sup router.Support) bool {
+	channels := sup.Channels
+	if len(channels) == 0 {
+		return cfg.IsEnabled(sup.Provider, router.Method{Family: sup.Family})
+	}
+	for _, ch := range channels {
+		if cfg.IsEnabled(sup.Provider, router.Method{Family: sup.Family, Channel: ch}) {
+			return true
+		}
+	}
+	return false
 }

@@ -19,6 +19,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
+	"net/url"
 	"strings"
 	"time"
 
@@ -51,6 +53,10 @@ type Config struct {
 	StaleAfter time.Duration
 	// BaseURLs overrides gateway base URLs (tests, sandboxes, proxies).
 	BaseURLs map[domain.ProviderCode]string
+	// NotificationBaseURL is this instance's public URL. Gateways that
+	// need a per-payment callback URL (iPaymu) get
+	// <NotificationBaseURL>/webhooks/<provider> when the caller sends none.
+	NotificationBaseURL string
 }
 
 type Service struct {
@@ -393,6 +399,12 @@ func (s *Service) run(ctx context.Context, claims routetoken.Claims, method rout
 		if cand.NeedsClientTok && cand.Provider == input.CardTokenProvider {
 			cardToken = strings.TrimSpace(input.CardToken)
 		}
+		notificationURL := s.notificationURL(cand, input.NotificationURL)
+		if missing := missingRequirements(cand.Support, input, notificationURL); len(missing) > 0 {
+			result.Attempts = append(result.Attempts, Attempt{Provider: cand.Provider, Outcome: "skipped", FailureClass: router.FailureNotSent,
+				Error: string(cand.Provider) + " requires " + strings.Join(missing, ", ")})
+			continue
+		}
 
 		attemptCtx, cancel := context.WithTimeout(ctx, timeout)
 		started := time.Now()
@@ -409,7 +421,7 @@ func (s *Service) run(ctx context.Context, claims routetoken.Claims, method rout
 			CustomerEmail:   input.CustomerEmail,
 			CustomerPhone:   input.CustomerPhone,
 			CardToken:       cardToken,
-			NotificationURL: input.NotificationURL,
+			NotificationURL: notificationURL,
 		})
 		cancel()
 		latency := time.Since(started)
@@ -423,8 +435,12 @@ func (s *Service) run(ctx context.Context, claims routetoken.Claims, method rout
 		}
 
 		lastErr = err
+		local := isPreflight(err) || rejectedLocally(err, created)
 		class := classify(err)
-		if !isPreflight(err) {
+		if local {
+			class = router.FailureNotSent
+		}
+		if !local {
 			// A rejection proves the gateway is up; everything else counts
 			// against its health. Local preflight errors never do.
 			s.router.Health().Record(cand.Provider, latency, class == router.FailureRejected)
@@ -458,7 +474,11 @@ func (s *Service) run(ctx context.Context, claims routetoken.Claims, method rout
 	if lastErr != nil {
 		result.Message = "no gateway accepted the payment: " + truncate(lastErr.Error(), 300)
 	} else {
-		result.Message = "every pinned gateway is unavailable (open circuit)"
+		reasons := make([]string, 0, len(result.Attempts))
+		for _, a := range result.Attempts {
+			reasons = append(reasons, a.Error)
+		}
+		result.Message = "no gateway could be attempted: " + strings.Join(reasons, "; ")
 	}
 	return result
 }
@@ -518,6 +538,53 @@ func issued(result ExecuteResult, method router.Method, cand router.Candidate, c
 		result.NextAction = &NextAction{Type: "none"}
 	}
 	return result
+}
+
+func (s *Service) notificationURL(cand router.Candidate, explicit string) string {
+	if cand.Support.RejectsNotificationURL {
+		// Xendit only accepts the dashboard-configured webhook URL.
+		return ""
+	}
+	if url := strings.TrimSpace(explicit); url != "" {
+		return url
+	}
+	if cand.Support.NeedsNotificationURL && strings.TrimSpace(s.cfg.NotificationBaseURL) != "" {
+		return strings.TrimRight(strings.TrimSpace(s.cfg.NotificationBaseURL), "/") + "/webhooks/" + string(cand.Provider)
+	}
+	return ""
+}
+
+func missingRequirements(support router.Support, input ExecuteInput, notificationURL string) []string {
+	var missing []string
+	if support.NeedsCustomerPhone && strings.TrimSpace(input.CustomerPhone) == "" {
+		missing = append(missing, "customer.phone")
+	}
+	if support.NeedsCustomerEmail && strings.TrimSpace(input.CustomerEmail) == "" {
+		missing = append(missing, "customer.email")
+	}
+	if support.NeedsNotificationURL && notificationURL == "" {
+		missing = append(missing, "notification_url (or RUTE_BAYAR_PUBLIC_URL)")
+	}
+	return missing
+}
+
+// rejectedLocally recognises adapter validation errors: no request was
+// built or sent, no response exists, and the error is not a transport
+// error. Such failures are safe to fall back from and say nothing about
+// the gateway's health.
+func rejectedLocally(err error, created paymentsvc.CreateResult) bool {
+	if len(created.Response.RawRequestJSON) > 0 || len(created.Response.RawResponseJSON) > 0 {
+		return false
+	}
+	if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
+		return false
+	}
+	var netErr net.Error
+	var urlErr *url.Error
+	if errors.As(err, &netErr) || errors.As(err, &urlErr) {
+		return false
+	}
+	return router.HTTPStatusFromError(err) == 0
 }
 
 func classify(err error) router.FailureClass {

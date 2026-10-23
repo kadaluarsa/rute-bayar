@@ -47,6 +47,8 @@ func ExecuteWithIO(ctx context.Context, args []string, stdout, stderr io.Writer)
 		return reconcileCommand(ctx, stdout, stderr, args[1:])
 	case "mcp":
 		return mcpCommand(ctx, stdout, stderr, args[1:])
+	case "gateways":
+		return gatewaysCommand(ctx, stdout, stderr, args[1:])
 	default:
 		return fmt.Errorf("unknown command %q", args[0])
 	}

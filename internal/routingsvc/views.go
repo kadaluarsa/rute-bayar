@@ -26,6 +26,7 @@ func QuoteView(d router.Decision) map[string]any {
 		"gateway_status":         d.Recommended.Status,
 		"mode":                   d.Recommended.Mode,
 		"requires_client_token":  d.Recommended.NeedsClientTok,
+		"requires":               d.Recommended.Requires,
 		"routing_token_required": true,
 		"fallbacks":              fallbacks,
 		"rejected":               d.Rejected,
@@ -40,6 +41,7 @@ func candidateView(c router.Candidate) map[string]any {
 		"fee_indicative": c.FeeIndicative,
 		"gateway_status": c.Status,
 		"mode":           c.Mode,
+		"requires":       c.Requires,
 	}
 }
 

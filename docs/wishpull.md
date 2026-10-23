@@ -133,6 +133,36 @@ Lokal (stdio): `rutebayar mcp --environment sandbox --db ./rute-bayar.sqlite3`.
 - Card token Midtrans tidak pernah dikirim ke gateway lain.
 - Setelah fallback, webhook dari gateway yang ditinggalkan diabaikan (`unmatched`) karena intent sudah milik gateway baru.
 
+### Gateway yang benar-benar tersedia
+
+Tidak semua gateway × metode bisa dipakai. Ada tiga lapis penyaring, dan quote menjelaskan alasan penolakan di `rejected[]`:
+
+1. **Dukungan adapter** (`method_not_supported_by_adapter`), ditentukan oleh kode:
+
+| Gateway | VA | QRIS | Kartu | E-wallet | Direct debit | Catatan |
+| --- | --- | --- | --- | --- | --- | --- |
+| Midtrans (Core API, direct) | bca, bni, bri, permata, cimb, mandiri (echannel) | ✓ | ✓ hanya dengan card token SDK Midtrans | ✗ (GoPay/ShopeePay belum) | ✗ | |
+| Xendit (Payment Session, hosted) | ✓ | ✓ | ✓ | ✓ | ✓ | Halaman Xendit; pelanggan bisa memilih metode lain, fee indikatif. Tidak menerima `notification_url` per pembayaran |
+| DOKU Checkout (hosted) | bca, mandiri, bri, bni, permata, cimb, danamon, maybank, btn, bnc, sinarmas | ✓ | ✓ | ovo, dana, linkaja, shopeepay, doku | ✗ | Refund nonaktif |
+| iPaymu (direct) | bca, bni, bri, mandiri, permata, cimb, bsi, muamalat | ✓ | ✗ | ✗ | ✗ | Wajib `customer.phone`, `customer.email`, dan notifyUrl. Refund belum ada. Kode channel `bsi`/`muamalat` perlu dicek ke dokumentasi iPaymu |
+
+2. **Kredensial** (`not_configured`): gateway tanpa akun di environment tersebut (DB atau `RUTE_BAYAR_ACCOUNT_*`) tidak pernah ditawarkan.
+3. **Aktivasi di akun merchant** (`not_enabled_for_merchant`): channel yang belum diaktifkan di dashboard PG (misalnya QRIS Midtrans yang belum disetujui) dinyatakan di config:
+
+```json
+{"enabled": {"midtrans": ["qris", "va_bca", "va_bni"], "doku": ["credit_card", "ewallet"], "ipaymu": []}}
+```
+
+Gateway yang tidak tercantum boleh melayani semua yang didukung adapternya; daftar kosong mematikan gateway. Entri divalidasi saat start, jadi salah ketik seperti `va_bcaa` membuat daemon gagal start, bukan diam-diam mematikan channel.
+
+Saat execute, syarat gateway (`requires` di quote) dicek sebelum memanggil gateway. Gateway yang syaratnya tidak terpenuhi dilewati (`skipped`) tanpa dihitung sebagai kegagalan gateway. Error validasi lokal adapter juga dianggap `not_sent`.
+
+Cek kondisi deployment Anda:
+
+```bash
+rutebayar gateways check --environment production
+```
+
 Tabel aturan dan MDR kontrak ada di `deploy/config/routing.example.json` (`RUTE_BAYAR_ROUTING_CONFIG`). MDR default hanya placeholder indikatif — ganti dengan angka kontrak Wishpull. Biaya handling Wishpull (open question PRD) diatur lewat `handling_fee_basis_points` / `handling_fee_fixed_idr`.
 
 ## 6. Event ke Wishpull
@@ -208,6 +238,7 @@ Semua variabel ada di `.env.example`. Yang wajib untuk produksi:
 - `RUTE_BAYAR_ENV=production`, `RUTE_BAYAR_REQUIRE_MANDATE=true`
 - tiga API key, `RUTE_BAYAR_ROUTING_TOKEN_KEYS` (`kid:base64`, buat dengan `openssl rand -base64 32`; untuk rotasi taruh kid baru di depan dan pertahankan kid lama sampai token lama kedaluwarsa)
 - `RUTE_BAYAR_WISHPULL_EVENTS_URL` + `_SECRET`
+- `RUTE_BAYAR_PUBLIC_URL` (dipakai sebagai notifyUrl iPaymu) dan daftar `enabled` sesuai aktivasi akun merchant
 - kredensial gateway lewat `RUTE_BAYAR_ACCOUNT_<PROVIDER>_PRODUCTION_CREDENTIAL_JSON` (di-mount dari Secret Manager) agar secret key tidak tersimpan di SQLite.
 
 Daemon mencetak peringatan saat start di produksi bila salah satu hal penting di atas belum diset.

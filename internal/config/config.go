@@ -31,6 +31,7 @@ type Config struct {
 	EventsURL           string
 	EventsSecret        string
 	MetricsToken        string
+	PublicURL           string
 	ShutdownGracePeriod time.Duration
 }
 
@@ -53,6 +54,7 @@ func Load() Config {
 		EventsURL:           envOrDefault(fileEnv, "RUTE_BAYAR_WISHPULL_EVENTS_URL", ""),
 		EventsSecret:        envOrDefault(fileEnv, "RUTE_BAYAR_WISHPULL_EVENTS_SECRET", ""),
 		MetricsToken:        envOrDefault(fileEnv, "RUTE_BAYAR_METRICS_TOKEN", ""),
+		PublicURL:           envOrDefault(fileEnv, "RUTE_BAYAR_PUBLIC_URL", ""),
 		ShutdownGracePeriod: envDurationOrDefault(fileEnv, "RUTE_BAYAR_SHUTDOWN_GRACE", 20*time.Second),
 	}
 }

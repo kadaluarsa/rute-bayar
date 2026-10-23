@@ -261,3 +261,38 @@ func TestLoadConfigOverlay(t *testing.T) {
 		t.Fatal("expected validation error for unknown provider")
 	}
 }
+
+func TestMerchantEnabledListRestrictsGateways(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Enabled = map[domain.ProviderCode][]string{
+		domain.ProviderMidtrans: {"va_bca", "qris"}, // BNI VA not activated on the merchant account
+		domain.ProviderIPaymu:   {},                 // gateway off
+	}
+	if err := cfg.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	r := New(cfg, nil, nil)
+	d, err := r.Quote(context.Background(), QuoteInput{Amount: 10000, Method: "va_bni"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range d.Plan() {
+		if c.Provider == domain.ProviderMidtrans || c.Provider == domain.ProviderIPaymu {
+			t.Fatalf("%s should be excluded for va_bni: %+v", c.Provider, d.Plan())
+		}
+	}
+	reasons := map[domain.ProviderCode]string{}
+	for _, rej := range d.Rejected {
+		reasons[rej.Provider] = rej.Reason
+	}
+	if reasons[domain.ProviderMidtrans] != "not_enabled_for_merchant" || reasons[domain.ProviderIPaymu] != "not_enabled_for_merchant" {
+		t.Fatalf("rejections = %v", d.Rejected)
+	}
+	if d, _ := r.Quote(context.Background(), QuoteInput{Amount: 10000, Method: "va_bca"}); d.Recommended.Provider != domain.ProviderMidtrans {
+		t.Fatalf("va_bca should still route to midtrans: %+v", d.Recommended)
+	}
+	cfg.Enabled = map[domain.ProviderCode][]string{domain.ProviderMidtrans: {"va_zzz_bad!"}}
+	if err := cfg.Validate(); err == nil {
+		t.Fatal("invalid enabled entries must fail validation")
+	}
+}

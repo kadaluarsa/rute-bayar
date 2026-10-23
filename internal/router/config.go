@@ -49,6 +49,29 @@ type Support struct {
 	// provider.CreatePaymentRequest fields the adapter expects.
 	AdapterMethod  string
 	AdapterChannel func(channel string) string
+
+	// Requirements the adapter enforces before it sends anything. The
+	// executor checks them up front so a missing field skips the gateway
+	// instead of looking like a gateway failure.
+	NeedsNotificationURL   bool
+	NeedsCustomerPhone     bool
+	NeedsCustomerEmail     bool
+	RejectsNotificationURL bool
+}
+
+// Requirements lists the customer/request fields this route needs.
+func (s Support) Requirements() []string {
+	var out []string
+	if s.NeedsCustomerPhone {
+		out = append(out, "customer.phone")
+	}
+	if s.NeedsCustomerEmail {
+		out = append(out, "customer.email")
+	}
+	if s.NeedsNotificationURL {
+		out = append(out, "notification_url")
+	}
+	return out
 }
 
 func (s Support) supportsChannel(channel string) bool {
@@ -77,17 +100,19 @@ func DefaultSupport() []Support {
 		{Provider: domain.ProviderDoku, Family: FamilyCreditCard, Mode: ModeHosted, ChannelEnforced: true, AdapterMethod: "credit_card", AdapterChannel: identity},
 		{Provider: domain.ProviderDoku, Family: FamilyEWallet, Channels: []string{"ovo", "dana", "linkaja", "shopeepay", "doku"}, Mode: ModeHosted, ChannelEnforced: true, AdapterMethod: "ewallet", AdapterChannel: identity},
 
-		{Provider: domain.ProviderIPaymu, Family: FamilyVA, Channels: []string{"bca", "bni", "bri", "mandiri", "permata", "cimb", "bsi", "muamalat"}, Mode: ModeDirect, ChannelEnforced: true, AdapterMethod: "va", AdapterChannel: identity},
-		{Provider: domain.ProviderIPaymu, Family: FamilyQRIS, Mode: ModeDirect, ChannelEnforced: true, AdapterMethod: "qris", AdapterChannel: func(string) string { return "qris" }},
+		// iPaymu direct payment refuses requests without notifyUrl, buyer
+		// phone and buyer email (see internal/provider/ipaymu).
+		{Provider: domain.ProviderIPaymu, Family: FamilyVA, Channels: []string{"bca", "bni", "bri", "mandiri", "permata", "cimb", "bsi", "muamalat"}, Mode: ModeDirect, ChannelEnforced: true, AdapterMethod: "va", AdapterChannel: identity, NeedsNotificationURL: true, NeedsCustomerPhone: true, NeedsCustomerEmail: true},
+		{Provider: domain.ProviderIPaymu, Family: FamilyQRIS, Mode: ModeDirect, ChannelEnforced: true, AdapterMethod: "qris", AdapterChannel: func(string) string { return "qris" }, NeedsNotificationURL: true, NeedsCustomerPhone: true, NeedsCustomerEmail: true},
 
 		// The Xendit adapter drives Payment Sessions (hosted payment link):
 		// the customer completes VA, QRIS, e-wallet or direct debit on
 		// Xendit's page. Native linked-account direct debit is not built yet.
-		{Provider: domain.ProviderXendit, Family: FamilyVA, Mode: ModeHosted, AdapterMethod: "payment_link", AdapterChannel: func(string) string { return "" }},
-		{Provider: domain.ProviderXendit, Family: FamilyQRIS, Mode: ModeHosted, AdapterMethod: "payment_link", AdapterChannel: func(string) string { return "" }},
-		{Provider: domain.ProviderXendit, Family: FamilyEWallet, Mode: ModeHosted, AdapterMethod: "payment_link", AdapterChannel: func(string) string { return "" }},
-		{Provider: domain.ProviderXendit, Family: FamilyDirectDebit, Mode: ModeHosted, AdapterMethod: "payment_link", AdapterChannel: func(string) string { return "" }},
-		{Provider: domain.ProviderXendit, Family: FamilyCreditCard, Mode: ModeHosted, AdapterMethod: "payment_link", AdapterChannel: func(string) string { return "" }},
+		{Provider: domain.ProviderXendit, Family: FamilyVA, Mode: ModeHosted, AdapterMethod: "payment_link", AdapterChannel: func(string) string { return "" }, RejectsNotificationURL: true},
+		{Provider: domain.ProviderXendit, Family: FamilyQRIS, Mode: ModeHosted, AdapterMethod: "payment_link", AdapterChannel: func(string) string { return "" }, RejectsNotificationURL: true},
+		{Provider: domain.ProviderXendit, Family: FamilyEWallet, Mode: ModeHosted, AdapterMethod: "payment_link", AdapterChannel: func(string) string { return "" }, RejectsNotificationURL: true},
+		{Provider: domain.ProviderXendit, Family: FamilyDirectDebit, Mode: ModeHosted, AdapterMethod: "payment_link", AdapterChannel: func(string) string { return "" }, RejectsNotificationURL: true},
+		{Provider: domain.ProviderXendit, Family: FamilyCreditCard, Mode: ModeHosted, AdapterMethod: "payment_link", AdapterChannel: func(string) string { return "" }, RejectsNotificationURL: true},
 	}
 }
 
@@ -123,6 +148,13 @@ type Config struct {
 	Fees map[domain.ProviderCode]map[Family]FeeRule `json:"fees"`
 	// HandlingFeeBasisPoints/HandlingFeeFixedIDR model Wishpull's own fee on
 	// top of the gateway MDR (PRD v0.3 open question); zero by default.
+	// Enabled restricts each gateway to the method keys or families that are
+	// actually activated on Wishpull's merchant account, e.g.
+	// {"midtrans": ["qris", "va_bca", "va_bni"], "doku": ["credit_card"]}.
+	// A gateway missing from the map may serve everything its adapter
+	// supports; an empty list disables the gateway entirely.
+	Enabled map[domain.ProviderCode][]string `json:"enabled"`
+
 	HandlingFeeBasisPoints int64 `json:"handling_fee_basis_points"`
 	HandlingFeeFixedIDR    int64 `json:"handling_fee_fixed_idr"`
 
@@ -189,6 +221,9 @@ func LoadConfig(path string) (Config, error) {
 			cfg.Fees[providerCode][family] = rule
 		}
 	}
+	if overlay.Enabled != nil {
+		cfg.Enabled = overlay.Enabled
+	}
 	cfg.HandlingFeeBasisPoints = overlay.HandlingFeeBasisPoints
 	cfg.HandlingFeeFixedIDR = overlay.HandlingFeeFixedIDR
 	if overlay.LatencyBudgetMs > 0 {
@@ -236,6 +271,20 @@ func (c Config) Validate() error {
 			}
 		}
 	}
+	for p, entries := range c.Enabled {
+		if !known[p] {
+			return fmt.Errorf("enabled list references unknown provider %q", p)
+		}
+		for _, entry := range entries {
+			e, err := parseEnabledEntry(entry)
+			if err != nil {
+				return fmt.Errorf("enabled list for %q: %w", p, err)
+			}
+			if !adapterSupports(p, e) {
+				return fmt.Errorf("enabled list for %q: %q is not supported by the %s adapter", p, entry, p)
+			}
+		}
+	}
 	for p, fees := range c.Fees {
 		if !known[p] {
 			return fmt.Errorf("fee table references unknown provider %q", p)
@@ -250,4 +299,53 @@ func (c Config) Validate() error {
 		}
 	}
 	return nil
+}
+
+// enabledEntry is one item of Config.Enabled: a whole family ("va") or one
+// method ("va_bca").
+type enabledEntry struct {
+	family  Family
+	channel string
+}
+
+func parseEnabledEntry(raw string) (enabledEntry, error) {
+	value := strings.ToLower(strings.TrimSpace(raw))
+	for _, f := range Families() {
+		if value == string(f) {
+			return enabledEntry{family: f}, nil
+		}
+	}
+	m, err := ParseMethod(value)
+	if err != nil {
+		return enabledEntry{}, err
+	}
+	return enabledEntry{family: m.Family, channel: m.Channel}, nil
+}
+
+// IsEnabled reports whether the merchant account has this method active
+// on the gateway.
+func (c Config) IsEnabled(code domain.ProviderCode, method Method) bool {
+	entries, restricted := c.Enabled[code]
+	if !restricted {
+		return true
+	}
+	for _, raw := range entries {
+		e, err := parseEnabledEntry(raw)
+		if err != nil || e.family != method.Family {
+			continue
+		}
+		if e.channel == "" || e.channel == method.Channel {
+			return true
+		}
+	}
+	return false
+}
+
+func adapterSupports(code domain.ProviderCode, e enabledEntry) bool {
+	for _, sup := range DefaultSupport() {
+		if sup.Provider == code && sup.Family == e.family && sup.supportsChannel(e.channel) {
+			return true
+		}
+	}
+	return false
 }
