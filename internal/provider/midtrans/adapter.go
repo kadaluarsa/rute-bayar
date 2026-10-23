@@ -189,7 +189,13 @@ func (a *Adapter) CreatePayment(ctx context.Context, request provider.CreatePaym
 			GrossAmount: request.Amount,
 		},
 	}
-	if paymentType == "bank_transfer" {
+	if paymentType == "bank_transfer" && isMidtransMandiriBill(bankCode) {
+		// Midtrans serves Mandiri VA as "echannel" (Mandiri Bill Payment),
+		// not as bank_transfer. The customer pays biller_code + bill_key.
+		paymentType = "echannel"
+		payload.PaymentType = paymentType
+		payload.EChannel = &midtransEChannel{BillInfo1: "Pembayaran", BillInfo2: truncateRunes(request.ExternalRef, 18)}
+	} else if paymentType == "bank_transfer" {
 		payload.BankTransfer = &midtransBankTransfer{Bank: bankCode}
 	}
 	if paymentType == "credit_card" {
@@ -243,6 +249,11 @@ func (a *Adapter) CreatePayment(ctx context.Context, request provider.CreatePaym
 	if err := json.Unmarshal(rawResponse, &parsed); err != nil {
 		return provider.CreatePaymentResponse{RawRequestJSON: rawRequest, RawResponseJSON: rawResponse}, fmt.Errorf("unmarshal midtrans create payment response: %w", err)
 	}
+	// Midtrans may answer HTTP 200 with an error status_code in the body
+	// (e.g. 406 duplicate order_id). Treat 4xx/5xx body codes as failures.
+	if code, convErr := strconv.Atoi(strings.TrimSpace(parsed.StatusCode)); convErr == nil && code >= 400 {
+		return provider.CreatePaymentResponse{RawRequestJSON: rawRequest, RawResponseJSON: rawResponse}, fmt.Errorf("midtrans create payment returned status %d: %s", code, strings.TrimSpace(parsed.StatusMessage))
+	}
 
 	response := provider.CreatePaymentResponse{
 		ProviderReference: parsed.OrderID,
@@ -258,7 +269,13 @@ func (a *Adapter) CreatePayment(ctx context.Context, request provider.CreatePaym
 	}
 	if len(parsed.VANumbers) > 0 {
 		response.VANumber = parsed.VANumbers[0].VANumber
+	} else if parsed.PermataVANumber != "" {
+		response.VANumber = parsed.PermataVANumber
+	} else if parsed.BillKey != "" {
+		response.VANumber = parsed.BillKey
+		response.BillerCode = parsed.BillerCode
 	}
+	response.QRString = parsed.QRString
 	if parsed.RedirectURL != "" {
 		response.RedirectURL = parsed.RedirectURL
 	} else if qrURL := midtransActionURL(parsed.Actions, "generate-qr-code"); qrURL != "" {
@@ -429,6 +446,7 @@ type midtransCreateChargeRequest struct {
 	BankTransfer       *midtransBankTransfer      `json:"bank_transfer,omitempty"`
 	CreditCard         *midtransCreditCard        `json:"credit_card,omitempty"`
 	QRIS               *midtransQRIS              `json:"qris,omitempty"`
+	EChannel           *midtransEChannel          `json:"echannel,omitempty"`
 	CustomerDetails    *midtransCustomerDetails   `json:"customer_details,omitempty"`
 }
 
@@ -444,6 +462,28 @@ type midtransBankTransfer struct {
 type midtransCreditCard struct {
 	TokenID        string `json:"token_id"`
 	Authentication bool   `json:"authentication"`
+}
+
+type midtransEChannel struct {
+	BillInfo1 string `json:"bill_info1"`
+	BillInfo2 string `json:"bill_info2"`
+}
+
+func isMidtransMandiriBill(bank string) bool {
+	switch strings.ToLower(strings.TrimSpace(bank)) {
+	case "mandiri", "echannel", "mandiri_bill":
+		return true
+	default:
+		return false
+	}
+}
+
+func truncateRunes(value string, limit int) string {
+	runes := []rune(value)
+	if len(runes) <= limit {
+		return value
+	}
+	return string(runes[:limit])
 }
 
 type midtransQRIS struct {
@@ -484,9 +524,13 @@ type midtransChargeResponse struct {
 		Bank     string `json:"bank"`
 		VANumber string `json:"va_number"`
 	} `json:"va_numbers"`
-	ExpiryTime  string `json:"expiry_time"`
-	RedirectURL string `json:"redirect_url"`
-	Actions     []struct {
+	PermataVANumber string `json:"permata_va_number"`
+	QRString        string `json:"qr_string"`
+	BillKey         string `json:"bill_key"`
+	BillerCode      string `json:"biller_code"`
+	ExpiryTime      string `json:"expiry_time"`
+	RedirectURL     string `json:"redirect_url"`
+	Actions         []struct {
 		Name   string `json:"name"`
 		Method string `json:"method"`
 		URL    string `json:"url"`
@@ -568,6 +612,7 @@ func (a *Adapter) ParseWebhook(_ context.Context, req provider.WebhookRequest) (
 		TransactionStatus string `json:"transaction_status"`
 		FraudStatus       string `json:"fraud_status"`
 		PaymentType       string `json:"payment_type"`
+		GrossAmount       string `json:"gross_amount"`
 	}
 
 	var webhook midtransWebhook
@@ -594,6 +639,7 @@ func (a *Adapter) ParseWebhook(_ context.Context, req provider.WebhookRequest) (
 		EventType:       eventType,
 		PaymentRef:      reference,
 		Status:          MapTransactionStatus(webhook.TransactionStatus, webhook.FraudStatus),
+		Amount:          provider.ParseIDRAmount(webhook.GrossAmount),
 		RawPayloadJSON:  req.Body,
 		RawHeadersJSON:  marshalHeaders(req.Headers),
 	}, nil

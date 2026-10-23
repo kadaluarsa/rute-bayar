@@ -1,0 +1,21 @@
+{
+  "rules": [
+    {"family": "qris", "candidates": ["midtrans", "xendit", "doku", "ipaymu"], "optimize": "lowest_fee"},
+    {"family": "va", "candidates": ["midtrans", "xendit", "doku", "ipaymu"], "optimize": "priority"},
+    {"family": "direct_debit", "candidates": ["xendit", "doku"], "optimize": "priority"},
+    {"family": "credit_card", "candidates": ["doku", "midtrans", "xendit"], "optimize": "priority"},
+    {"family": "ewallet", "candidates": ["doku", "xendit"], "optimize": "lowest_fee"}
+  ],
+  "fees": {
+    "midtrans": {"qris": {"basis_points": 70}, "va": {"fixed_idr": 4000}, "credit_card": {"basis_points": 290, "fixed_idr": 2000}},
+    "xendit": {"qris": {"basis_points": 63}, "va": {"fixed_idr": 4500}, "ewallet": {"basis_points": 150}, "direct_debit": {"basis_points": 190}, "credit_card": {"basis_points": 290, "fixed_idr": 2000}},
+    "doku": {"qris": {"basis_points": 70}, "va": {"fixed_idr": 4500}, "ewallet": {"basis_points": 150}, "credit_card": {"basis_points": 280, "fixed_idr": 2500}},
+    "ipaymu": {"qris": {"basis_points": 70}, "va": {"fixed_idr": 4000}}
+  },
+  "handling_fee_basis_points": 0,
+  "handling_fee_fixed_idr": 0,
+  "latency_budget_ms": 3000,
+  "pull_method_timeout_ms": 20000,
+  "breaker_failure_threshold": 3,
+  "breaker_open_ms": 300000
+}

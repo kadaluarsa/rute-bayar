@@ -361,6 +361,7 @@ func (a *Adapter) ParseWebhook(_ context.Context, req provider.WebhookRequest) (
 		EventType:       eventType,
 		PaymentRef:      reference,
 		Status:          mapDokuWebhookStatus(status),
+		Amount:          provider.ParseIDRAmount(dokuStringFromObject(order, "amount")),
 		RawPayloadJSON:  req.Body,
 		RawHeadersJSON:  marshalHeaders(req.Headers),
 	}, nil

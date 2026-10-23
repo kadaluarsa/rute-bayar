@@ -1,0 +1,90 @@
+# Rute Bayar for Wishpull on GKE Autopilot (asia-southeast2, Jakarta).
+#
+# One replica on purpose: storage is SQLite on a persistent disk, and the
+# per-order execution lock lives in that database. Do not scale replicas
+# above 1 until the storage layer moves to Cloud SQL Postgres.
+#
+# Secrets come from Secret Manager (e.g. via External Secrets or the
+# Secret Manager CSI driver) into the `rute-bayar-secrets` Secret.
+apiVersion: v1
+kind: Service
+metadata:
+  name: rute-bayar
+  namespace: payments
+spec:
+  selector:
+    app: rute-bayar
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8080
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: rute-bayar
+  namespace: payments
+spec:
+  serviceName: rute-bayar
+  replicas: 1
+  selector:
+    matchLabels:
+      app: rute-bayar
+  template:
+    metadata:
+      labels:
+        app: rute-bayar
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: /metrics
+        prometheus.io/port: "8080"
+    spec:
+      terminationGracePeriodSeconds: 30
+      securityContext:
+        runAsNonRoot: true
+        fsGroup: 65532
+      containers:
+        - name: rute-bayar
+          image: asia-southeast2-docker.pkg.dev/PROJECT/payments/rute-bayar:VERSION
+          ports:
+            - containerPort: 8080
+          env:
+            - name: RUTE_BAYAR_ENV
+              value: production
+            - name: RUTE_BAYAR_REQUIRE_MANDATE
+              value: "true"
+            - name: RUTE_BAYAR_WISHPULL_EVENTS_URL
+              value: https://wishpull-webhook-ingress.internal/rute-bayar/events
+          envFrom:
+            - secretRef:
+                # Keys: RUTE_BAYAR_API_KEY, RUTE_BAYAR_AGENT_API_KEY,
+                # RUTE_BAYAR_EXECUTOR_API_KEY, RUTE_BAYAR_ROUTING_TOKEN_KEYS,
+                # RUTE_BAYAR_WISHPULL_EVENTS_SECRET, RUTE_BAYAR_METRICS_TOKEN,
+                # RUTE_BAYAR_ACCOUNT_<PROVIDER>_PRODUCTION_CREDENTIAL_JSON ...
+                name: rute-bayar-secrets
+          readinessProbe:
+            httpGet:
+              path: /api/v1/readiness
+              port: 8080
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 250m
+              memory: 256Mi
+          volumeMounts:
+            - name: data
+              mountPath: /data
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: premium-rwo
+        resources:
+          requests:
+            storage: 20Gi

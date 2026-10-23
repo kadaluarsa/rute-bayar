@@ -176,7 +176,17 @@ func (s *Store) CountPaymentIntents(ctx context.Context, provider domain.Provide
 	return total, nil
 }
 
+// sqlExecer is satisfied by *sql.DB and *sql.Tx.
+type sqlExecer interface {
+	ExecContext(context.Context, string, ...any) (sql.Result, error)
+	QueryRowContext(context.Context, string, ...any) *sql.Row
+}
+
 func (s *Store) UpsertPaymentIntent(ctx context.Context, intent domain.PaymentIntent) (string, error) {
+	return upsertPaymentIntent(ctx, s.db, intent)
+}
+
+func upsertPaymentIntent(ctx context.Context, db sqlExecer, intent domain.PaymentIntent) (string, error) {
 	id := intent.ID
 	if id == "" {
 		id = newID("payment_intent")
@@ -187,7 +197,7 @@ func (s *Store) UpsertPaymentIntent(ctx context.Context, intent domain.PaymentIn
 	}
 	now := time.Now().UTC().Format(time.RFC3339Nano)
 
-	_, err := s.db.ExecContext(ctx, `
+	_, err := db.ExecContext(ctx, `
 		INSERT INTO payment_intents (
 			id,
 			external_ref,
@@ -224,7 +234,7 @@ func (s *Store) UpsertPaymentIntent(ctx context.Context, intent domain.PaymentIn
 	}
 
 	var savedID string
-	if err := s.db.QueryRowContext(ctx, `
+	if err := db.QueryRowContext(ctx, `
 		SELECT id
 		FROM payment_intents
 		WHERE external_ref = ?

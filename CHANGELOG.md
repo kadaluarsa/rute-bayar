@@ -4,6 +4,21 @@ All notable changes to Rute Bayar will be documented in this file.
 
 ## Unreleased
 
+### Added
+
+- Wishpull v0.3 routing plane: gateway router with fee/priority rules and circuit breakers, HMAC routing tokens, `mandateCovers` enforcement, and idempotent per-order execution with double-charge-safe fallback (`/api/v1/routes/quote`, `/token`, `/execute`, `/executions/{order_id}`, `/api/v1/gateways/health`).
+- MCP server (`POST /mcp` and `rutebayar mcp` stdio) exposing only read-only routing tools to AI agents.
+- Role-scoped API keys (admin, agent, executor) and `RUTE_BAYAR_REQUIRE_MANDATE` to close direct payment creation.
+- Signed, retrying outbox of normalized payment events to Wishpull (`RUTE_BAYAR_WISHPULL_EVENTS_URL`), with admin listing and requeue endpoints.
+- Gateway credentials from environment variables (`RUTE_BAYAR_ACCOUNT_<PROVIDER>_<ENV>_CREDENTIAL_JSON`) for Secret Manager.
+- Prometheus `/metrics`, graceful SIGTERM shutdown, Dockerfile, GKE StatefulSet manifest and routing config example.
+- Midtrans Mandiri VA via `echannel` (biller code + bill key) and QRIS `qr_string`.
+
+### Changed
+
+- Webhooks now refuse to mark a payment paid when the gateway-reported amount differs from the intent (`amount_mismatch`), and ignore out-of-order events that would move a payment backwards (`stale`).
+- Midtrans charges answered with HTTP 200 but a 4xx/5xx `status_code` in the body are treated as failures.
+
 ### Fixed
 
 - Keep generated Homebrew formula URLs interpolating `#{version}` correctly during release tap sync.

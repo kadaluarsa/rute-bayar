@@ -15,6 +15,10 @@ components:
       type: apiKey
       in: header
       name: X-API-Key
+      description: |
+        Three roles (Wishpull v0.3): admin (RUTE_BAYAR_API_KEY), agent
+        (RUTE_BAYAR_AGENT_API_KEY) and executor (RUTE_BAYAR_EXECUTOR_API_KEY).
+        The key may also be sent as "Authorization: Bearer <key>".
   schemas:
     StandardResponse:
       type: object
@@ -826,3 +830,206 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Stats'
+  /api/v1/routes/quote:
+    post:
+      tags: [wishpull-routing]
+      summary: RP-1 get_optimized_payment_route (agent, executor, admin)
+      description: Recommend a gateway for a method and exact IDR amount, with fee, health and fallback plan. Moves no money.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [amount, preferred_method]
+              properties:
+                amount: {type: integer, minimum: 1, description: Whole rupiah, never rounded}
+                preferred_method: {type: string, example: va_mandiri}
+                currency: {type: string, enum: [IDR]}
+                user_id: {type: string}
+                has_client_token: {type: boolean}
+                client_token_provider: {type: string, enum: [midtrans, xendit, doku, ipaymu]}
+      responses:
+        '200':
+          description: route decision (recommended_gateway, estimated_fee, gateway_status, fallbacks, rejected, fallback_policy)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnvelopeData'
+        '422':
+          description: no gateway can serve the method (error_code no_route)
+      x-mcp-operation: get_optimized_payment_route
+  /api/v1/routes/token:
+    post:
+      tags: [wishpull-routing]
+      summary: RP-2 generate_secure_routing_token (agent, executor, admin)
+      description: Re-quotes server-side and pins order, mandate, merchant, cart hash, amount, method and gateways into an HMAC token that never outlives the mandate.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [order_id, mandate_id, merchant_id, cart_hash, amount, preferred_method, mandate_expires_at]
+              properties:
+                order_id: {type: string}
+                mandate_id: {type: string}
+                merchant_id: {type: string}
+                cart_hash: {type: string}
+                amount: {type: integer, minimum: 1}
+                preferred_method: {type: string}
+                mandate_expires_at: {type: string, format: date-time}
+                user_id: {type: string}
+                has_client_token: {type: boolean}
+                client_token_provider: {type: string}
+      responses:
+        '200':
+          description: routing_token, token_id, expires_at, pinned_gateways, estimated_fee
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnvelopeData'
+      x-mcp-operation: generate_secure_routing_token
+  /api/v1/routes/execute:
+    post:
+      tags: [wishpull-routing]
+      summary: EX-1/EX-2/EX-3 execute a routing token (executor only)
+      description: |
+        Verifies the token, runs mandateCovers, then calls the pinned gateways with
+        double-charge-safe fallback. Idempotent per order_id. Never exposed over MCP.
+        data.status is one of issued, mandate_rejected, failed, requires_reconcile.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [routing_token, mandate]
+              properties:
+                routing_token: {type: string}
+                mandate:
+                  type: object
+                  required: [mandate_id, order_id, merchant_id, cart_hash, amount, expires_at]
+                  properties:
+                    mandate_id: {type: string}
+                    order_id: {type: string}
+                    merchant_id: {type: string}
+                    cart_hash: {type: string}
+                    amount: {type: integer}
+                    currency: {type: string, enum: [IDR]}
+                    expires_at: {type: string, format: date-time}
+                    revoked: {type: boolean}
+                card_token: {type: string, description: Gateway SDK token produced on the device; never raw card data}
+                card_token_provider: {type: string}
+                notification_url: {type: string}
+                customer:
+                  type: object
+                  properties:
+                    name: {type: string}
+                    email: {type: string}
+                    phone: {type: string}
+      responses:
+        '200':
+          description: execution outcome (status, provider, instrument, next_action, challenge_required, attempts, violations, replayed)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnvelopeData'
+        '409':
+          description: another execution for the order is in progress, or environment mismatch
+        '422':
+          description: invalid or expired routing token
+      x-mcp-operation: none (deterministic workflow only)
+  /api/v1/routes/executions/{order_id}:
+    get:
+      tags: [wishpull-routing]
+      summary: Stored execution outcome for an order (executor, admin)
+      parameters:
+        - name: order_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: execution record
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnvelopeData'
+        '404':
+          description: no execution for the order
+  /api/v1/gateways/health:
+    get:
+      tags: [wishpull-routing]
+      summary: RP-3 gateway breaker state, success rate and p95 latency (agent, executor, admin)
+      responses:
+        '200':
+          description: per-gateway health snapshots
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnvelopeData'
+      x-mcp-operation: get_gateway_health
+  /api/v1/outbound-events:
+    get:
+      tags: [wishpull-routing]
+      summary: Outbox of signed events to Wishpull (admin)
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, delivered, dead]
+        - name: order_id
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: outbound events
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnvelopeData'
+  /api/v1/outbound-events/{id}/requeue:
+    post:
+      tags: [wishpull-routing]
+      summary: Move a dead or pending event back to pending now (admin)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: requeued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnvelopeData'
+  /mcp:
+    post:
+      tags: [wishpull-routing]
+      summary: Model Context Protocol endpoint (JSON-RPC 2.0, Streamable HTTP with JSON responses)
+      description: Tools get_optimized_payment_route, generate_secure_routing_token, get_gateway_health, get_payment_status, list_payment_methods. Requires the agent, executor or admin key as a bearer token.
+      responses:
+        '200':
+          description: JSON-RPC response
+        '202':
+          description: notification accepted
+        '401':
+          description: missing or invalid key
+  /metrics:
+    get:
+      tags: [ops]
+      summary: Prometheus metrics (bearer RUTE_BAYAR_METRICS_TOKEN when set)
+      security: []
+      responses:
+        '200':
+          description: Prometheus text exposition format

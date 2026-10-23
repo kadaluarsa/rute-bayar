@@ -270,7 +270,7 @@ func (a *Adapter) ParseWebhook(_ context.Context, request provider.WebhookReques
 		return provider.WebhookEvent{}, errors.New("ipaymu webhook missing trx_id or reference_id")
 	}
 	headersJSON, _ := json.Marshal(request.Headers)
-	return provider.WebhookEvent{ProviderEventID: provider.BuildWebhookEventID("ipaymu", trxID, ref, statusCodeValue), EventType: firstNonEmpty(values.Get("status"), "payment.status"), PaymentRef: firstNonEmpty(ref, trxID), Status: MapStatusCode(statusCode), RawPayloadJSON: request.Body, RawHeadersJSON: headersJSON}, nil
+	return provider.WebhookEvent{ProviderEventID: provider.BuildWebhookEventID("ipaymu", trxID, ref, statusCodeValue), EventType: firstNonEmpty(values.Get("status"), "payment.status"), PaymentRef: firstNonEmpty(ref, trxID), Status: MapStatusCode(statusCode), Amount: provider.ParseIDRAmount(values.Get("amount")), RawPayloadJSON: request.Body, RawHeadersJSON: headersJSON}, nil
 }
 
 func MapStatusCode(code int) domain.PaymentStatus {

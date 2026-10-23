@@ -492,11 +492,20 @@ func (a *Adapter) ParseWebhook(_ context.Context, req provider.WebhookRequest) (
 		providerEventID = ""
 	}
 
+	var amount int64
+	if !isXenditRefundEvent(eventType) {
+		amount = provider.ParseIDRAmount(firstNonEmpty(
+			xenditStringFromObject(data, "paid_amount", "captured_amount", "amount", "request_amount"),
+			xenditStringFromObject(payload, "paid_amount", "captured_amount", "amount", "request_amount"),
+		))
+	}
+
 	return provider.WebhookEvent{
 		ProviderEventID: strings.TrimSpace(providerEventID),
 		EventType:       eventType,
 		PaymentRef:      strings.TrimSpace(reference),
 		Status:          mapXenditWebhookStatus(eventType, status),
+		Amount:          amount,
 		RawPayloadJSON:  req.Body,
 		RawHeadersJSON:  marshalHeaders(req.Headers),
 	}, nil
