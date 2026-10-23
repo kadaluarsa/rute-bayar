@@ -18,9 +18,9 @@ import (
 	"github.com/pendig/rute-bayar/internal/domain"
 	"github.com/pendig/rute-bayar/internal/forwarding"
 	"github.com/pendig/rute-bayar/internal/forwardingsvc"
-	"github.com/pendig/rute-bayar/internal/paymentsvc"
-	"github.com/pendig/rute-bayar/internal/providerfactory"
+	"github.com/pendig/rute-bayar/internal/outbox"
 	"github.com/pendig/rute-bayar/internal/storage/sqlite"
+	"github.com/pendig/rute-bayar/internal/webhooksvc"
 )
 
 const (
@@ -69,63 +69,67 @@ func webhookCommand(ctx context.Context, stdout, stderr io.Writer, args []string
 			return err
 		}
 
-		srv := daemon.NewServer(*addr, nil, nil, nil)
-		var apiServer *api.Server
+		store, err := sqlite.Open(ctx, *dbPath)
+		if err != nil {
+			return err
+		}
+		defer store.Close()
 
-		if selectedMode == webhookModeAPI {
-			store, err := sqlite.Open(ctx, *dbPath)
-			if err != nil {
-				return err
-			}
-			defer store.Close()
+		env := domain.Environment(environmentValue)
+		plane, err := buildRoutingPlane(cfg, store, env)
+		if err != nil {
+			return err
+		}
+		productionWarnings(stderr, cfg, env)
 
-			factory := providerfactory.New(store)
-			apiServer = api.NewServer(api.Config{
+		newAPIServer := func() *api.Server {
+			return api.NewServer(api.Config{
 				Version:            strings.TrimSpace(build.Version),
 				APIKey:             cfg.APIKey,
 				AllowedOrigins:     cfg.APIAllowedOrigins,
 				RateLimitPerMinute: cfg.APIRateLimit,
 				AuditSink:          store,
 				Store:              store,
-				PaymentService:     paymentsvc.New(store, factory),
+				PaymentService:     plane.payments,
 				DatabasePath:       *dbPath,
-				DefaultEnvironment: domain.Environment(environmentValue),
+				DefaultEnvironment: env,
+				AgentAPIKey:        cfg.AgentAPIKey,
+				ExecutorAPIKey:     cfg.ExecutorAPIKey,
+				RequireMandate:     cfg.RequireMandate,
+				Routing:            plane.routing,
+				Outbox:             store,
+				Metrics:            plane.metrics,
+				MetricsToken:       cfg.MetricsToken,
+				MCP:                plane.mcp,
 			})
+		}
 
+		if selectedMode == webhookModeAPI {
+			srv := daemon.NewServer(*addr, nil, nil, nil).WithAPIHandler(newAPIServer().Handler())
 			fmt.Fprintf(stdout, "Rute Bayar API daemon listening on %s\n", *addr)
 			fmt.Fprintf(stdout, "api environment: %s\n", environmentValue)
 			fmt.Fprintf(stdout, "SQLite database: %s\n", *dbPath)
-			srv = srv.WithAPIHandler(apiServer.Handler())
-			return srv.ListenAndServe()
+			return srv.Serve(ctx, cfg.ShutdownGracePeriod)
 		}
 
-		store, err := sqlite.Open(ctx, *dbPath)
+		handlers, err := plane.factory.WebhookHandlers(ctx, env)
 		if err != nil {
 			return err
 		}
-		defer store.Close()
-		factory := providerfactory.New(store)
-
-		handlers, err := factory.WebhookHandlers(ctx, domain.Environment(environmentValue))
-		if err != nil {
-			return err
+		processor := webhooksvc.New(store, forwarding.NewService(store), handlers).WithMetrics(plane.metrics)
+		if strings.TrimSpace(cfg.EventsURL) != "" {
+			dispatcher, err := outbox.NewDispatcher(store, outbox.Config{URL: cfg.EventsURL, Secret: cfg.EventsSecret}, nil, plane.metrics)
+			if err != nil {
+				return fmt.Errorf("wishpull events outbox: %w", err)
+			}
+			processor = processor.WithEvents(store, env)
+			go dispatcher.Run(ctx)
+			fmt.Fprintf(stdout, "wishpull events: %s\n", cfg.EventsURL)
 		}
 
-		apiServer = api.NewServer(api.Config{
-			Version:            strings.TrimSpace(build.Version),
-			APIKey:             cfg.APIKey,
-			AllowedOrigins:     cfg.APIAllowedOrigins,
-			RateLimitPerMinute: cfg.APIRateLimit,
-			AuditSink:          store,
-			Store:              store,
-			PaymentService:     paymentsvc.New(store, factory),
-			DatabasePath:       *dbPath,
-			DefaultEnvironment: domain.Environment(environmentValue),
-		})
-
-		srv = daemon.NewServer(*addr, store, forwarding.NewService(store), handlers)
+		srv := daemon.NewServer(*addr, store, forwarding.NewService(store), handlers).WithProcessor(processor)
 		if selectedMode == webhookModeAll {
-			srv = srv.WithAPIHandler(apiServer.Handler())
+			srv = srv.WithAPIHandler(newAPIServer().Handler())
 		}
 
 		if selectedMode == webhookModeWebhook {
@@ -135,7 +139,7 @@ func webhookCommand(ctx context.Context, stdout, stderr io.Writer, args []string
 		}
 		fmt.Fprintf(stdout, "webhook environment: %s\n", environmentValue)
 		fmt.Fprintf(stdout, "SQLite database: %s\n", *dbPath)
-		return srv.ListenAndServe()
+		return srv.Serve(ctx, cfg.ShutdownGracePeriod)
 	case "replay":
 		return webhookReplayCommand(ctx, stdout, stderr, args[1:])
 	case "forward":

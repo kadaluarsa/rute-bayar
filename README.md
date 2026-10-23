@@ -26,6 +26,18 @@ Latest release: [v0.1.11](https://github.com/pendig/rute-bayar/releases/tag/v0.1
 - SQLite-first local storage.
 - Initial support target: Xendit Payment Sessions, Midtrans, DOKU Checkout, and iPaymu.
 
+## Wishpull routing plane (v0.3)
+
+Rute Bayar can run as Wishpull's **Indonesia Universal Payment Gateway MCP Router**: it picks the gateway (lowest MDR or priority, with live health), pins the route into an HMAC routing token, and executes the charge only for Wishpull's deterministic workflow after a strict `mandateCovers` check.
+
+- `POST /api/v1/routes/quote` and `POST /api/v1/routes/token` for agents; `POST /api/v1/routes/execute` for the executor key only.
+- Double-charge-safe fallback with per-gateway circuit breakers (push methods fall back on timeout; direct charges stop at `requires_reconcile`).
+- MCP server (`POST /mcp`, or `rutebayar mcp` over stdio) with read-only tools only; no tool can move money.
+- Webhook hardening: paid amount must match the intent, status can only move forward, and normalized events reach Wishpull through a signed, retrying outbox.
+- Role-scoped API keys, `RUTE_BAYAR_REQUIRE_MANDATE`, gateway credentials from Secret Manager via environment, Prometheus `/metrics`, graceful shutdown, Dockerfile and a GKE manifest.
+
+Full guide (Bahasa Indonesia): [docs/wishpull.md](./docs/wishpull.md).
+
 ## AI Agent Skill
 
 Rute Bayar also ships an AI Agent skill for agent runners and coding assistants that need a clear workflow for sandbox/prod setup, invoice creation, payment status checks, webhook forwarding, provider contribution, and release readiness.

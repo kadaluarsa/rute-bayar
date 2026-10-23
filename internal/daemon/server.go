@@ -1,10 +1,13 @@
 package daemon
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/pendig/rute-bayar/internal/domain"
 	"github.com/pendig/rute-bayar/internal/forwarding"
@@ -36,7 +39,47 @@ func (s *Server) WithAPIHandler(handler http.Handler) *Server {
 	return s
 }
 
+// WithProcessor replaces the webhook processor, e.g. one configured with
+// the Wishpull outbox and metrics.
+func (s *Server) WithProcessor(processor *webhooksvc.Service) *Server {
+	s.processor = processor
+	return s
+}
+
 func (s *Server) ListenAndServe() error {
+	return http.ListenAndServe(s.addr, s.Handler())
+}
+
+// Serve runs until ctx is cancelled, then drains in-flight requests for up
+// to grace (Cloud Run sends SIGTERM and allows ~10s by default).
+func (s *Server) Serve(ctx context.Context, grace time.Duration) error {
+	srv := &http.Server{
+		Addr:              s.addr,
+		Handler:           s.Handler(),
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		WriteTimeout:      90 * time.Second,
+		IdleTimeout:       120 * time.Second,
+	}
+	errCh := make(chan error, 1)
+	go func() { errCh <- srv.ListenAndServe() }()
+	select {
+	case err := <-errCh:
+		return err
+	case <-ctx.Done():
+	}
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), grace)
+	defer cancel()
+	if err := srv.Shutdown(shutdownCtx); err != nil {
+		return err
+	}
+	if err := <-errCh; err != nil && !errors.Is(err, http.ErrServerClosed) {
+		return err
+	}
+	return nil
+}
+
+func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", s.health)
 	if s.processor != nil {
@@ -45,7 +88,7 @@ func (s *Server) ListenAndServe() error {
 	if s.apiHandler != nil {
 		mux.Handle("/", s.apiHandler)
 	}
-	return http.ListenAndServe(s.addr, mux)
+	return mux
 }
 
 func (s *Server) health(w http.ResponseWriter, _ *http.Request) {

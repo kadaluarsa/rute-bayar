@@ -104,6 +104,22 @@ type ReconcileResult struct {
 	Response          provider.PaymentStatusResponse
 }
 
+// PreflightError wraps a Create failure that happened before any request
+// was sent to the gateway (validation, missing credentials, storage). The
+// router treats it as "not sent": falling back is always safe and the
+// gateway's health is not affected.
+type PreflightError struct{ Err error }
+
+func (e *PreflightError) Error() string { return e.Err.Error() }
+func (e *PreflightError) Unwrap() error { return e.Err }
+
+func preflight(err error) error {
+	if err == nil {
+		return nil
+	}
+	return &PreflightError{Err: err}
+}
+
 func New(store Store, factory *providerfactory.Factory) *Service {
 	if factory == nil {
 		factory = providerfactory.New(store)
@@ -123,19 +139,19 @@ func paymentIntentMetadata(environment domain.Environment) json.RawMessage {
 func (s *Service) Create(ctx context.Context, input CreateInput) (CreateResult, error) {
 	providerCode, err := normalizeProvider(input.Provider)
 	if err != nil {
-		return CreateResult{}, err
+		return CreateResult{}, preflight(err)
 	}
 	if err := validateEnvironment(input.Environment); err != nil {
-		return CreateResult{}, err
+		return CreateResult{}, preflight(err)
 	}
 	if strings.TrimSpace(input.ExternalRef) == "" {
-		return CreateResult{}, fmt.Errorf("reference is required")
+		return CreateResult{}, preflight(fmt.Errorf("reference is required"))
 	}
 	if input.Amount <= 0 {
-		return CreateResult{}, fmt.Errorf("amount must be greater than zero")
+		return CreateResult{}, preflight(fmt.Errorf("amount must be greater than zero"))
 	}
 	if s == nil || s.store == nil || s.factory == nil {
-		return CreateResult{}, fmt.Errorf("payment service is not configured")
+		return CreateResult{}, preflight(fmt.Errorf("payment service is not configured"))
 	}
 
 	currency := strings.ToUpper(strings.TrimSpace(input.Currency))
@@ -156,13 +172,13 @@ func (s *Service) Create(ctx context.Context, input CreateInput) (CreateResult, 
 	}
 	request, err = normalizeCreateRequest(providerCode, request)
 	if err != nil {
-		return CreateResult{}, err
+		return CreateResult{}, preflight(err)
 	}
 	metadata := paymentIntentMetadata(input.Environment)
 
 	adapter, err := s.factory.AdapterForStoredAccount(ctx, providerCode, input.Environment, input.BaseURL)
 	if err != nil {
-		return CreateResult{}, err
+		return CreateResult{}, preflight(err)
 	}
 
 	intentID, err := s.store.UpsertPaymentIntent(ctx, domain.PaymentIntent{
@@ -174,7 +190,7 @@ func (s *Service) Create(ctx context.Context, input CreateInput) (CreateResult, 
 		MetadataJSON: metadata,
 	})
 	if err != nil {
-		return CreateResult{}, err
+		return CreateResult{}, preflight(err)
 	}
 
 	response, err := adapter.CreatePayment(ctx, request)

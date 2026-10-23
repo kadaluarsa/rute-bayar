@@ -38,11 +38,17 @@ type CreatePaymentResponse struct {
 	TransactionStatus string
 	FraudStatus       string
 	VANumber          string
-	ExpiryTime        string
-	RedirectURL       string
-	Status            domain.PaymentStatus
-	RawRequestJSON    []byte
-	RawResponseJSON   []byte
+	// BillerCode accompanies VANumber for Mandiri Bill Payment (Midtrans
+	// echannel), where VANumber holds the bill key.
+	BillerCode string
+	// QRString is the raw QRIS payload when the gateway returns one, so the
+	// app can render the code itself instead of loading a remote image.
+	QRString        string
+	ExpiryTime      string
+	RedirectURL     string
+	Status          domain.PaymentStatus
+	RawRequestJSON  []byte
+	RawResponseJSON []byte
 }
 
 type PaymentStatusResponse struct {
@@ -92,8 +98,11 @@ type WebhookEvent struct {
 	EventType       string
 	PaymentRef      string
 	Status          domain.PaymentStatus
-	RawPayloadJSON  []byte
-	RawHeadersJSON  []byte
+	// Amount is the paid amount in IDR when the gateway reports it, else 0.
+	// Wishpull compares it with the intent amount before trusting "paid".
+	Amount         int64
+	RawPayloadJSON []byte
+	RawHeadersJSON []byte
 }
 
 // BuildWebhookEventID joins non-empty parts with colon separators.

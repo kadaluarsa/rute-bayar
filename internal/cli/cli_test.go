@@ -948,3 +948,16 @@ func TestReconcileMidtransUpdatesIntent(t *testing.T) {
 		t.Fatalf("intent status = %q, want settled", intent.Status)
 	}
 }
+
+func TestGatewaysCheckPrintsMatrix(t *testing.T) {
+	t.Setenv("RUTE_BAYAR_DB_PATH", filepath.Join(t.TempDir(), "gw.sqlite3"))
+	t.Setenv("RUTE_BAYAR_ACCOUNT_MIDTRANS_SANDBOX_CREDENTIAL_JSON", `{"server_key":"x"}`)
+	var out bytes.Buffer
+	if err := ExecuteWithIO(context.Background(), []string{"gateways", "check", "--environment", "sandbox"}, &out, &bytes.Buffer{}); err != nil {
+		t.Fatal(err)
+	}
+	text := out.String()
+	if !strings.Contains(text, "midtrans  qris") || !strings.Contains(text, "needs customer.phone") || !strings.Contains(text, "missing") {
+		t.Fatalf("unexpected output:\n%s", text)
+	}
+}

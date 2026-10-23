@@ -22,7 +22,9 @@ import (
 	"github.com/pendig/rute-bayar/internal/domain"
 	"github.com/pendig/rute-bayar/internal/forwarding"
 	"github.com/pendig/rute-bayar/internal/forwardingsvc"
+	"github.com/pendig/rute-bayar/internal/metrics"
 	"github.com/pendig/rute-bayar/internal/paymentsvc"
+	"github.com/pendig/rute-bayar/internal/routingsvc"
 )
 
 const (
@@ -64,6 +66,16 @@ type Server struct {
 	environment   domain.Environment
 	databasePath  string
 
+	// Wishpull routing plane.
+	agentKey       string
+	executorKey    string
+	requireMandate bool
+	routing        *routingsvc.Service
+	outbox         OutboxStore
+	metrics        *metrics.Set
+	metricsToken   string
+	mcp            http.Handler
+
 	rateBuckets    map[string]*rateBucket
 	bucketsMu      sync.Mutex
 	idempotencyMu  sync.Mutex
@@ -80,6 +92,23 @@ type Config struct {
 	PaymentService     PaymentService
 	DatabasePath       string
 	DefaultEnvironment domain.Environment
+
+	// AgentAPIKey may quote routes, issue routing tokens, read gateway
+	// health and use the MCP endpoint. It can never execute a charge.
+	AgentAPIKey string
+	// ExecutorAPIKey is held only by Wishpull's Temporal worker; it is the
+	// only key that may call /api/v1/routes/execute.
+	ExecutorAPIKey string
+	// RequireMandate disables direct POST /api/v1/payments so every charge
+	// goes through a routing token plus mandateCovers (PRD v0.3 EX-3).
+	RequireMandate bool
+	Routing        *routingsvc.Service
+	Outbox         OutboxStore
+	Metrics        *metrics.Set
+	// MetricsToken, when set, is required as a bearer token on /metrics.
+	MetricsToken string
+	// MCP is the Model Context Protocol handler mounted at /mcp.
+	MCP http.Handler
 }
 
 type Store interface {
@@ -136,6 +165,14 @@ func NewServer(cfg Config) *Server {
 		environment:    defaultEnvironment(cfg.DefaultEnvironment),
 		rateBuckets:    map[string]*rateBucket{},
 		idempotencyMap: map[string]idempotencyEntry{},
+		agentKey:       strings.TrimSpace(cfg.AgentAPIKey),
+		executorKey:    strings.TrimSpace(cfg.ExecutorAPIKey),
+		requireMandate: cfg.RequireMandate,
+		routing:        cfg.Routing,
+		outbox:         cfg.Outbox,
+		metrics:        cfg.Metrics,
+		metricsToken:   strings.TrimSpace(cfg.MetricsToken),
+		mcp:            cfg.MCP,
 	}
 }
 
@@ -163,7 +200,6 @@ func (s *Server) Handler() http.Handler {
 	handled("GET", "/api/v1/payments", s.paymentsListHandler, true)
 	handled("POST", "/api/v1/payments", s.paymentsCreateHandler, true)
 	handled("GET", "/api/v1/payments/{reference}", s.paymentGetHandler, true)
-	handled("GET", "/api/v1/payments/{reference}/status", s.paymentStatusHandler, true)
 	handled("POST", "/api/v1/payments/{reference}/refund", s.paymentRefundHandler, true)
 	handled("GET", "/api/v1/readiness", s.readinessHandler, false)
 
@@ -176,8 +212,31 @@ func (s *Server) Handler() http.Handler {
 	handled("PUT", "/api/v1/webhook-forwarding-targets/{id}", s.webhookForwardingTargetUpdateHandler, true)
 	handled("DELETE", "/api/v1/webhook-forwarding-targets/{id}", s.webhookForwardingTargetDeleteHandler, true)
 	handled("GET", "/api/v1/webhook-forwarding-attempts", s.webhookForwardingAttemptsListHandler, true)
-	handled("POST", "/api/v1/reconcile/{provider}/{reference}", s.paymentReconcileHandler, true)
 	handled("GET", "/api/v1/stats", s.statsHandler, true)
+
+	// Wishpull v0.3 routing plane.
+	byRole := func(method, path string, fn endpointFunc, roles ...role) {
+		mux.HandleFunc(method+" "+path, s.wrapRoles(fn, roles...))
+		if _, seen := registeredOptions[path]; !seen {
+			mux.HandleFunc("OPTIONS "+path, s.wrap(s.handleCORSPreflight, false))
+			registeredOptions[path] = struct{}{}
+		}
+	}
+	byRole("POST", "/api/v1/routes/quote", s.routeQuoteHandler, roleAgent, roleExecutor, roleAdmin)
+	byRole("POST", "/api/v1/routes/token", s.routeTokenHandler, roleAgent, roleExecutor, roleAdmin)
+	byRole("POST", "/api/v1/routes/execute", s.routeExecuteHandler, roleExecutor)
+	byRole("GET", "/api/v1/routes/executions/{order_id}", s.routeExecutionGetHandler, roleExecutor, roleAdmin)
+	byRole("GET", "/api/v1/gateways/health", s.gatewayHealthHandler, roleAgent, roleExecutor, roleAdmin)
+	// Gateway inquiries move no money, so the workflow may resolve
+	// requires_reconcile outcomes itself.
+	byRole("GET", "/api/v1/payments/{reference}/status", s.paymentStatusHandler, roleExecutor, roleAdmin)
+	byRole("POST", "/api/v1/reconcile/{provider}/{reference}", s.paymentReconcileHandler, roleExecutor, roleAdmin)
+	byRole("GET", "/api/v1/outbound-events", s.outboundEventsListHandler, roleAdmin)
+	byRole("POST", "/api/v1/outbound-events/{id}/requeue", s.outboundEventRequeueHandler, roleAdmin)
+	mux.HandleFunc("GET /metrics", s.metricsHandler)
+	if s.mcp != nil {
+		mux.Handle("/mcp", s.mcpHandler())
+	}
 
 	mux.Handle("/", http.NotFoundHandler())
 	return mux
@@ -210,7 +269,7 @@ func (s *Server) wrap(fn endpointFunc, requireAuth bool) http.HandlerFunc {
 			return
 		}
 
-		if requireAuth && !s.isAuthorized(r) {
+		if requireAuth && s.resolveRole(r) != roleAdmin {
 			status := http.StatusUnauthorized
 			code := errUnauthorized
 			message := "missing or invalid API key"
@@ -245,17 +304,13 @@ func (s *Server) writeCORSHeaders(w http.ResponseWriter) {
 	w.Header().Set("Access-Control-Allow-Origin", s.allowedOrigin)
 	w.Header().Set("Vary", headerOrigin)
 	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, X-API-Key, X-Request-ID, Idempotency-Key")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-API-Key, X-Request-ID, Idempotency-Key, Mcp-Session-Id, Mcp-Protocol-Version")
 	w.Header().Set("Access-Control-Allow-Credentials", "true")
 	w.Header().Set("Access-Control-Max-Age", "3600")
 }
 
 func (s *Server) isAuthorized(r *http.Request) bool {
-	if s.apiKey == "" {
-		return false
-	}
-	provided := strings.TrimSpace(r.Header.Get("X-API-Key"))
-	return provided == s.apiKey && provided != ""
+	return s.resolveRole(r) == roleAdmin
 }
 
 type rateBucket struct {
@@ -269,8 +324,11 @@ func (s *Server) allowRate(r *http.Request, remoteAddr string) bool {
 		return true
 	}
 
-	key := strings.TrimSpace(r.Header.Get("X-API-Key"))
-	if s.apiKey == "" || key != s.apiKey {
+	key := ""
+	if resolved := s.resolveRole(r); resolved != roleNone {
+		key = resolved.String() + ":" + presentedKeyDigest(r)
+	}
+	if key == "" {
 		key = remoteAddr
 		if host, _, splitErr := net.SplitHostPort(remoteAddr); splitErr == nil {
 			key = host
@@ -351,7 +409,7 @@ func (s *Server) writeJSON(w http.ResponseWriter, r *http.Request, requestID str
 }
 
 func (s *Server) audit(r *http.Request, requestID string, status int, durationMs int64) {
-	apiKey := strings.TrimSpace(r.Header.Get("X-API-Key"))
+	apiKey := presentedKey(r)
 	actorID := "anonymous"
 	if apiKey != "" {
 		digest := sha256.Sum256([]byte(apiKey))
@@ -359,7 +417,7 @@ func (s *Server) audit(r *http.Request, requestID string, status int, durationMs
 	}
 	event := auditlog.Event{
 		RequestID:  requestID,
-		ActorType:  "api-client",
+		ActorType:  "api-client:" + s.resolveRole(r).String(),
 		ActorID:    actorID,
 		Method:     r.Method,
 		Path:       r.URL.Path,
@@ -627,6 +685,9 @@ func (s *Server) paymentsListHandler(r *http.Request) (any, error) {
 }
 
 func (s *Server) paymentsCreateHandler(r *http.Request) (any, error) {
+	if s.requireMandate {
+		return nil, NewError(http.StatusForbidden, errForbidden, "direct payment creation is disabled (RUTE_BAYAR_REQUIRE_MANDATE=true); issue a routing token and call POST /api/v1/routes/execute with the verified mandate")
+	}
 	service, err := s.requirePaymentService()
 	if err != nil {
 		return nil, err

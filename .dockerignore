@@ -1,0 +1,8 @@
+.git
+bin
+dist
+site
+*.sqlite3
+*.db
+.env
+.env.*

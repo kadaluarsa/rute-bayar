@@ -5,12 +5,17 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/pendig/rute-bayar/internal/build"
 )
 
 func Execute(args []string) error {
-	return ExecuteWithIO(context.Background(), args, os.Stdout, os.Stderr)
+	// SIGTERM (Cloud Run, Kubernetes) and Ctrl-C trigger graceful shutdown.
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	return ExecuteWithIO(ctx, args, os.Stdout, os.Stderr)
 }
 
 func ExecuteWithIO(ctx context.Context, args []string, stdout, stderr io.Writer) error {
@@ -40,6 +45,10 @@ func ExecuteWithIO(ctx context.Context, args []string, stdout, stderr io.Writer)
 		return dbCommand(ctx, stdout, args[1:])
 	case "reconcile":
 		return reconcileCommand(ctx, stdout, stderr, args[1:])
+	case "mcp":
+		return mcpCommand(ctx, stdout, stderr, args[1:])
+	case "gateways":
+		return gatewaysCommand(ctx, stdout, stderr, args[1:])
 	default:
 		return fmt.Errorf("unknown command %q", args[0])
 	}
